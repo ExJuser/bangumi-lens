@@ -18,6 +18,21 @@ test("history item hover does not start title marquee over action buttons", () =
   );
 });
 
+test("desktop history sidebar does not shift when page scrolling begins", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(
+    css,
+    /\.app-shell\s*\{[\s\S]*?padding:\s*34px 0 64px;/,
+    "Desktop shell top padding is the sidebar's natural top offset"
+  );
+  assert.match(
+    css,
+    /\.history-sidebar\s*\{[\s\S]*?top:\s*34px;[\s\S]*?max-height:\s*calc\(100vh - 68px\);/,
+    "Sticky sidebar top offset should match the desktop shell top padding to avoid an initial scroll jump"
+  );
+});
+
 test("history action buttons stay above non-interactive metadata", () => {
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
 
