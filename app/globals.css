@@ -246,7 +246,7 @@ input {
 }
 
 .hero-report {
-  grid-template-columns: minmax(0, 0.85fr) minmax(620px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr) minmax(620px, 720px);
   align-items: end;
   min-height: 240px;
   padding-bottom: 18px;
@@ -716,6 +716,8 @@ input {
   gap: 10px;
   align-items: stretch;
   justify-content: flex-end;
+  width: min(100%, 720px);
+  justify-self: end;
 }
 
 .metric {
