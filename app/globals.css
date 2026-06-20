@@ -181,7 +181,7 @@ input {
   gap: 5px;
   width: 0;
   min-width: 0;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -212,11 +212,11 @@ input {
 
 .history-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px;
+  grid-template-columns: minmax(0, 1fr) 68px;
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 31px;
+  min-height: 34px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -233,7 +233,7 @@ input {
 
 .history-item-label {
   min-width: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.45;
 }
 
@@ -276,8 +276,8 @@ input {
   grid-template-columns: auto;
   align-items: center;
   justify-items: end;
-  width: 56px;
-  min-width: 56px;
+  width: 68px;
+  min-width: 68px;
 }
 
 .history-saved-at,

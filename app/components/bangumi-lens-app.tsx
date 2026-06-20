@@ -525,10 +525,10 @@ function formatSavedAt(savedAt: string) {
   const hour = 60 * minute;
   const day = 24 * hour;
 
-  if (elapsedMs < hour) return `${Math.floor(elapsedMs / minute)} 分`;
-  if (elapsedMs < day) return `${Math.floor(elapsedMs / hour)} 小时`;
+  if (elapsedMs < hour) return `${Math.floor(elapsedMs / minute)} 分前`;
+  if (elapsedMs < day) return `${Math.floor(elapsedMs / hour)} 小时前`;
   if (elapsedMs < 2 * day) return "昨天";
-  if (elapsedMs < 30 * day) return `${Math.floor(elapsedMs / day)} 天`;
+  if (elapsedMs < 30 * day) return `${Math.floor(elapsedMs / day)} 天前`;
 
   return new Intl.DateTimeFormat("zh-CN", {
     month: "numeric",
