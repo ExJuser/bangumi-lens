@@ -618,7 +618,7 @@ export default function BangumiLensApp() {
           setReportSwitching(false);
           reportSwitchingFrameRef.current = null;
           reportSwitchingTimeoutRef.current = null;
-        }, 160);
+        }, 200);
       });
     });
   }, []);
