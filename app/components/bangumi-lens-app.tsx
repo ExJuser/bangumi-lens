@@ -1231,6 +1231,7 @@ export default function BangumiLensApp() {
           const savedItem = findExistingReport(payload.history, nextReport.meta.url);
           if (savedItem) {
             loadedRouteReportIdRef.current = savedItem.id;
+            pendingRouteReportIdRef.current = savedItem.id;
             router.replace(getReportRoute(savedItem.id));
           }
         }

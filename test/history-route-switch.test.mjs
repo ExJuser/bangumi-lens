@@ -18,6 +18,11 @@ test("history route effect does not reopen the stale route during a pending clie
   );
   assert.match(
     source,
+    /pendingRouteReportIdRef\.current = savedItem\.id;[\s\S]*?router\.replace\(getReportRoute\(savedItem\.id\)\);/,
+    "Saving a newly generated report should mark the route switch before replacing the stale report route"
+  );
+  assert.match(
+    source,
     /if \(pendingRouteReportIdRef\.current && pendingRouteReportIdRef\.current !== routeReportId\) return;/,
     "Route synchronization should not reopen a stale pathname while a newer client switch is pending"
   );
