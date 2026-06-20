@@ -266,6 +266,7 @@ type SeasonReportGenerationItem = {
 };
 
 type SeasonReportGenerationState = {
+  subjectKey: string;
   status: "running" | "completed" | "cancelled" | "failed";
   totalCount: number;
   completedCount: number;
@@ -278,6 +279,7 @@ type SeasonReportGenerationState = {
 };
 
 type PendingSeasonReportGeneration = {
+  subjectKey: string;
   subjectName: string;
   savedReportCount: number;
   episodeTotal?: number;
@@ -938,6 +940,14 @@ function getSubjectNameFromMeta(meta: Report["meta"]) {
   return meta.subjectTitleCn || meta.subjectTitle || "未分类动画";
 }
 
+function getSubjectKeyFromMeta(meta: Report["meta"]) {
+  return meta.subjectId ? `id:${meta.subjectId}` : `name:${getSubjectNameFromMeta(meta)}`;
+}
+
+function getSubjectKey(report: Report) {
+  return getSubjectKeyFromMeta(report.meta);
+}
+
 function getHeroSubjectTitle(meta: Report["meta"]) {
   return meta.subjectTitle || meta.subjectTitleCn || "未分类动画";
 }
@@ -1448,13 +1458,18 @@ export default function BangumiLensApp() {
   const returningHomeRef = useRef(false);
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
+  const currentSubjectKey = report ? getSubjectKey(report) : "";
+  const visibleSeasonReportGeneration =
+    seasonReportGeneration?.subjectKey === currentSubjectKey ? seasonReportGeneration : null;
+  const visiblePendingSeasonReportGeneration =
+    pendingSeasonReportGeneration?.subjectKey === currentSubjectKey ? pendingSeasonReportGeneration : null;
   const searchSelectionOpen = searchResults.length > 0 || Boolean(selectedSearchResult);
   const modalOpen = Boolean(
     searchSelectionOpen ||
       pendingDuplicate ||
       pendingAutoAnalyzeUrl ||
       pendingReportRegeneration ||
-      pendingSeasonReportGeneration ||
+      visiblePendingSeasonReportGeneration ||
       pendingAiTitleTranslation ||
       pendingAiSubjectTitleTranslation ||
       missingEpisodePrompt ||
@@ -1700,6 +1715,11 @@ export default function BangumiLensApp() {
   }, [pendingAiSubjectTitleTranslation]);
 
   useEffect(() => {
+    setPendingSeasonReportGeneration((current) => (current && current.subjectKey !== currentSubjectKey ? null : current));
+    setSeasonReportGeneration((current) => (current && current.subjectKey !== currentSubjectKey ? null : current));
+  }, [currentSubjectKey]);
+
+  useEffect(() => {
     const subjectId = report?.meta.subjectId;
     if (!subjectId || subjectInfoById[subjectId]) return;
 
@@ -1926,7 +1946,7 @@ export default function BangumiLensApp() {
 
   async function prepareSeasonReportGeneration() {
     const currentReport = report;
-    if (!currentReport || seasonReportGeneration?.status === "running") return;
+    if (!currentReport || visibleSeasonReportGeneration?.status === "running") return;
 
     setSeasonTrendError("");
 
@@ -1945,6 +1965,7 @@ export default function BangumiLensApp() {
       }
 
       const subjectName = getSubjectName(currentReport);
+      const subjectKey = getSubjectKey(currentReport);
       const savedEpisodeIds = new Set(
         history
           .filter((item) => {
@@ -1973,6 +1994,7 @@ export default function BangumiLensApp() {
       }
 
       setPendingSeasonReportGeneration({
+        subjectKey,
         subjectName,
         savedReportCount: savedCount,
         episodeTotal: subjectInfo?.episodeTotal ?? currentReport.meta.episodeTotal,
@@ -1984,14 +2006,15 @@ export default function BangumiLensApp() {
   }
 
   async function confirmSeasonReportGeneration() {
-    if (!pendingSeasonReportGeneration) return;
-    const generationPlan = pendingSeasonReportGeneration;
+    if (!visiblePendingSeasonReportGeneration) return;
+    const generationPlan = visiblePendingSeasonReportGeneration;
     setPendingSeasonReportGeneration(null);
     seasonReportGenerationCancelledRef.current = false;
     seasonReportGenerationAbortRef.current?.abort();
 
     const initialItems = generationPlan.candidates.map((item) => ({ ...item, status: "pending" as const }));
     setSeasonReportGeneration({
+      subjectKey: generationPlan.subjectKey,
       status: "running",
       totalCount: initialItems.length,
       completedCount: 0,
@@ -2136,9 +2159,9 @@ export default function BangumiLensApp() {
   }, [groupedHistory]);
 
   const currentSubjectHistory = useMemo(() => {
-    if (!report) return [];
-    return sortSavedReportsByEpisode(history.filter((item) => getSubjectNameFromMeta(getSavedReportMeta(item)) === getSubjectName(report)));
-  }, [history, report]);
+    if (!currentSubjectKey) return [];
+    return sortSavedReportsByEpisode(history.filter((item) => getSubjectKeyFromMeta(getSavedReportMeta(item)) === currentSubjectKey));
+  }, [currentSubjectKey, history]);
 
   const currentKnownEpisodeTotal = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId]?.episodeTotal : undefined;
   const currentSubjectInfo = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId] : undefined;
@@ -2991,7 +3014,7 @@ export default function BangumiLensApp() {
               aiSummary={seasonTrendAiSummary}
               aiSummaryLoading={seasonTrendAiSummaryLoading}
               aiSummaryError={seasonTrendAiSummaryError}
-              generation={seasonReportGeneration}
+              generation={visibleSeasonReportGeneration}
               onRequestAiSummary={requestSeasonTrendAiSummary}
               onPrepareSeasonGeneration={prepareSeasonReportGeneration}
               onCancelSeasonGeneration={cancelSeasonReportGeneration}
@@ -3209,7 +3232,7 @@ export default function BangumiLensApp() {
           ]}
         />
       ) : null}
-      {pendingSeasonReportGeneration ? (
+      {visiblePendingSeasonReportGeneration ? (
         <ConfirmDialog
           titleId="season-report-generation-title"
           icon={<Sparkles size={20} />}
@@ -3217,7 +3240,7 @@ export default function BangumiLensApp() {
           title="确认生成缺失章节报告？"
           description={
             <>
-              将为《{pendingSeasonReportGeneration.subjectName}》串行生成 {pendingSeasonReportGeneration.candidates.length} 集缺失报告，
+              将为《{visiblePendingSeasonReportGeneration.subjectName}》串行生成 {visiblePendingSeasonReportGeneration.candidates.length} 集缺失报告，
               生成完成一集就保存一集。中途取消只会停止后续生成，已经完成的报告会保留。
             </>
           }

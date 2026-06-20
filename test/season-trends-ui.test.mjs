@@ -61,3 +61,14 @@ test("season report generation progress shows active in-flight progress", () => 
   assert.match(source, /season-report-progress-track running/);
   assert.match(css, /season-report-progress-shine/);
 });
+
+test("season report generation progress is scoped to the current subject", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+
+  assert.match(source, /subjectKey: string;/);
+  assert.match(source, /function getSubjectKeyFromMeta/);
+  assert.match(source, /visibleSeasonReportGeneration/);
+  assert.match(source, /visiblePendingSeasonReportGeneration/);
+  assert.match(source, /setSeasonReportGeneration\(\(current\) => \(current && current\.subjectKey !== currentSubjectKey \? null : current\)\)/);
+  assert.match(source, /generation=\{visibleSeasonReportGeneration\}/);
+});
