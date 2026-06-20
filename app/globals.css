@@ -1444,8 +1444,8 @@ input {
 .panel > p {
   margin: 16px 0 0;
   color: var(--ink);
-  font-size: 17px;
-  line-height: 1.75;
+  font-size: 18px;
+  line-height: 1.78;
 }
 
 .rich-emphasis,
@@ -1527,7 +1527,7 @@ input {
 
 .report-item h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 18px;
 }
 
 .quote-list a {
@@ -1549,7 +1549,8 @@ input {
 .report-item p {
   margin: 0;
   color: var(--muted);
-  line-height: 1.65;
+  font-size: 16px;
+  line-height: 1.72;
 }
 
 .quote-list {
@@ -1571,8 +1572,8 @@ input {
     linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%),
     color-mix(in srgb, var(--field) 86%, var(--panel));
   color: var(--ink);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.62;
 }
 
 .quote-list svg {
@@ -1653,7 +1654,7 @@ input {
 .spoiler-card-head p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .spoiler-list {
@@ -1677,7 +1678,8 @@ input {
   border-radius: 8px;
   background: var(--field);
   color: var(--ink);
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.62;
   overflow: hidden;
 }
 
