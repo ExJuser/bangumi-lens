@@ -212,7 +212,7 @@ input {
 
 .history-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px;
+  grid-template-columns: minmax(0, 1fr) 72px;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -272,23 +272,22 @@ input {
 
 .history-item-meta {
   display: inline-grid;
-  grid-template-columns: repeat(2, 32px);
+  grid-template-columns: 18px minmax(0, 1fr) 32px;
   align-items: center;
   justify-content: end;
   justify-items: end;
-  width: 88px;
-  min-width: 88px;
+  width: 72px;
+  min-width: 72px;
 }
 
 .history-saved-at,
 .history-like-indicator,
-.history-like,
 .history-delete {
   grid-row: 1;
 }
 
 .history-saved-at {
-  grid-column: 1 / -1;
+  grid-column: 2 / 4;
   color: var(--muted);
   font-size: 13px;
   line-height: 1;
@@ -300,7 +299,7 @@ input {
 
 .history-like-indicator {
   grid-column: 1;
-  justify-self: start;
+  justify-self: center;
   color: var(--accent-dark);
   line-height: 0;
 }
@@ -310,15 +309,10 @@ input {
   pointer-events: none;
 }
 
-.history-like {
-  grid-column: 1;
-}
-
 .history-delete {
-  grid-column: 2;
+  grid-column: 3;
 }
 
-.history-like,
 .history-delete {
   display: grid !important;
   flex: 0 0 auto;
@@ -334,32 +328,24 @@ input {
 
 .history-item:hover .history-delete,
 .history-item:focus-visible .history-delete,
-.history-delete:focus-visible,
-.history-item:hover .history-like,
-.history-item:focus-visible .history-like,
-.history-like:focus-visible {
+.history-delete:focus-visible {
   opacity: 1;
 }
 
-.history-like.liked,
 .history-item.liked .history-item-label {
   color: var(--accent-dark);
 }
 
 .history-item:hover .history-like-indicator,
 .history-item:focus-visible .history-like-indicator,
-.history-item:has(.history-like:focus-visible) .history-like-indicator,
 .history-item:has(.history-delete:focus-visible) .history-like-indicator,
 .history-item:hover .history-saved-at,
 .history-item:focus-visible .history-saved-at,
-.history-item:has(.history-like:focus-visible) .history-saved-at,
 .history-item:has(.history-delete:focus-visible) .history-saved-at {
   opacity: 0;
 }
 
-.history-like:hover,
 .history-delete:hover,
-.history-like:focus-visible,
 .history-delete:focus-visible {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-dark);

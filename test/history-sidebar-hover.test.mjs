@@ -33,7 +33,32 @@ test("history action buttons stay above non-interactive metadata", () => {
   );
   assert.match(
     css,
-    /\.history-like,[\s\S]*?\.history-delete\s*\{[\s\S]*?z-index:\s*1;/,
-    "Action buttons should be painted above passive metadata in the shared grid cell"
+    /\.history-delete\s*\{[\s\S]*?z-index:\s*1;/,
+    "Delete action should be painted above passive metadata in the shared grid cell"
+  );
+  assert.doesNotMatch(
+    css,
+    /\.history-like(?!-indicator)\b/,
+    "The sidebar should not expose a like action; liking is handled from the report page"
+  );
+});
+
+test("liked history marker does not overlap the saved timestamp", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(
+    css,
+    /\.history-item-meta\s*\{[\s\S]*?grid-template-columns:\s*18px minmax\(0,\s*1fr\) 32px;/,
+    "Liked marker, timestamp, and delete action should have separate grid tracks"
+  );
+  assert.match(
+    css,
+    /\.history-saved-at\s*\{[\s\S]*?grid-column:\s*2 \/ 4;/,
+    "Saved timestamp should start after the liked marker track and reach the right edge"
+  );
+  assert.match(
+    css,
+    /\.history-like-indicator\s*\{[\s\S]*?grid-column:\s*1;/,
+    "Liked marker should stay in its own leading track"
   );
 });

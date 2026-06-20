@@ -825,6 +825,7 @@ export default function BangumiLensApp() {
   const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(() => new Set());
   const autoAnalyzeUrlRef = useRef<string | null>(null);
   const loadedRouteReportIdRef = useRef<string | null>(null);
+  const pendingRouteReportIdRef = useRef<string | null>(null);
   const returningHomeRef = useRef(false);
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
@@ -893,6 +894,7 @@ export default function BangumiLensApp() {
       );
       const route = getReportRoute(item.id);
       if (window.location.pathname !== route) {
+        pendingRouteReportIdRef.current = item.id;
         if (options?.replace) {
           router.replace(route);
         } else {
@@ -907,6 +909,13 @@ export default function BangumiLensApp() {
       }
     }
   }, [report?.meta.url, router, scheduleReportSwitchingEnd]);
+
+  useEffect(() => {
+    const routeReportId = getReportIdFromPath(pathname);
+    if (pendingRouteReportIdRef.current === routeReportId) {
+      pendingRouteReportIdRef.current = null;
+    }
+  }, [pathname]);
 
   useEffect(() => {
     async function loadHistory() {
@@ -1444,11 +1453,13 @@ export default function BangumiLensApp() {
       }
 
       if (!routeReportId) {
+        if (pendingRouteReportIdRef.current) return;
         loadedRouteReportIdRef.current = null;
         setReport(null);
         return;
       }
 
+      if (pendingRouteReportIdRef.current && pendingRouteReportIdRef.current !== routeReportId) return;
       if (loadedRouteReportIdRef.current === routeReportId) return;
       const routeItem = history.find((item) => item.id === routeReportId) || { id: routeReportId } as SavedReport;
       await openSavedReport(routeItem, { replace: true });
@@ -1623,26 +1634,6 @@ export default function BangumiLensApp() {
                                 </span>
                               ) : null}
                               {savedAtLabel ? <span className="history-saved-at">{savedAtLabel}</span> : null}
-                              <span
-                                className={liked ? "history-like liked" : "history-like"}
-                                role="button"
-                                tabIndex={0}
-                                title={liked ? "取消喜欢" : "标记为喜欢"}
-                                aria-pressed={liked}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleReportLike(item, !liked);
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    toggleReportLike(item, !liked);
-                                  }
-                                }}
-                              >
-                                <Heart size={17} fill={liked ? "currentColor" : "none"} />
-                              </span>
                               <span
                                 className="history-delete"
                                 role="button"
