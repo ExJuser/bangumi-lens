@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { ConfirmDialog } from "./confirm-dialog";
 
 type ReportItem = {
@@ -573,11 +574,52 @@ export default function BangumiLensApp() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [reportSwitching, setReportSwitching] = useState(false);
   const autoAnalyzeUrlRef = useRef<string | null>(null);
   const loadedRouteReportIdRef = useRef<string | null>(null);
+  const reportSwitchingFrameRef = useRef<number | null>(null);
+  const reportSwitchingTimeoutRef = useRef<number | null>(null);
+
+  const scheduleReportSwitchingEnd = useCallback(() => {
+    if (reportSwitchingFrameRef.current !== null) {
+      window.cancelAnimationFrame(reportSwitchingFrameRef.current);
+    }
+    if (reportSwitchingTimeoutRef.current !== null) {
+      window.clearTimeout(reportSwitchingTimeoutRef.current);
+    }
+
+    reportSwitchingFrameRef.current = window.requestAnimationFrame(() => {
+      reportSwitchingFrameRef.current = window.requestAnimationFrame(() => {
+        reportSwitchingTimeoutRef.current = window.setTimeout(() => {
+          setReportSwitching(false);
+          reportSwitchingFrameRef.current = null;
+          reportSwitchingTimeoutRef.current = null;
+        }, 160);
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (reportSwitchingFrameRef.current !== null) {
+        window.cancelAnimationFrame(reportSwitchingFrameRef.current);
+      }
+      if (reportSwitchingTimeoutRef.current !== null) {
+        window.clearTimeout(reportSwitchingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const openSavedReport = useCallback(async (item: SavedReport, options?: { replace?: boolean }) => {
+    const currentReportUrl = report?.meta.url;
+    const targetReportUrl = getSavedReportMeta(item).url;
+    const shouldMaskSwitch = Boolean(currentReportUrl && targetReportUrl && currentReportUrl !== targetReportUrl);
+
     try {
+      if (shouldMaskSwitch) {
+        flushSync(() => setReportSwitching(true));
+      }
+
       let nextReport = item.report;
       let nextUrl = item.url;
       if (!nextReport) {
@@ -610,8 +652,12 @@ export default function BangumiLensApp() {
       }
     } catch {
       // Opening a saved report can be retried from the history list.
+    } finally {
+      if (shouldMaskSwitch) {
+        scheduleReportSwitchingEnd();
+      }
     }
-  }, [router]);
+  }, [report?.meta.url, router, scheduleReportSwitchingEnd]);
 
   useEffect(() => {
     async function loadHistory() {
@@ -1057,6 +1103,7 @@ export default function BangumiLensApp() {
 
   return (
     <main className="app-shell">
+      {reportSwitching ? <div className="report-switch-mask" aria-hidden="true" /> : null}
       <aside className="history-sidebar">
         <div className="history-title">
           <span>
