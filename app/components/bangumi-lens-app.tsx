@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Trash2,
   ExternalLink,
   Eye,
@@ -16,6 +17,7 @@ import {
   MessageCircle,
   Moon,
   Quote,
+  RefreshCw,
   Search,
   Sparkles,
   Star,
@@ -53,6 +55,7 @@ type Report = {
   discussionHotspots: ReportItem[];
   resonancePoints: ReportItem[];
   spoilerNotes: string[];
+  generatedAt?: string;
   meta: {
     url: string;
     episodeId: string;
@@ -158,6 +161,7 @@ function HoverScrollText({ className, text }: { className?: string; text: string
 
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
 const REPORT_ROUTE_PREFIX = "/reports/";
+const REPORT_STALE_THRESHOLD_MS = 15 * 24 * 60 * 60 * 1000;
 type ThemeMode = "day" | "night";
 type EpisodeDirection = "previous" | "next";
 type MissingEpisodePrompt = {
@@ -180,6 +184,10 @@ type PendingAiTitleTranslation = {
   subjectTitle?: string;
   subjectTitleCn?: string;
   episodeNumber?: number;
+};
+type PendingReportRegeneration = {
+  url: string;
+  title: string;
 };
 type LikeHistoryPrompt = {
   item: SavedReport;
@@ -574,6 +582,30 @@ function formatSavedAt(savedAt: string) {
   }).format(new Date(savedTime));
 }
 
+function formatReportGeneratedAt(generatedAt?: string) {
+  if (!generatedAt) return "";
+
+  const generatedTime = new Date(generatedAt).getTime();
+  if (!Number.isFinite(generatedTime)) return "";
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(generatedTime));
+}
+
+function isReportStale(generatedAt?: string) {
+  if (!generatedAt) return false;
+
+  const generatedTime = new Date(generatedAt).getTime();
+  if (!Number.isFinite(generatedTime)) return false;
+
+  return Date.now() - generatedTime > REPORT_STALE_THRESHOLD_MS;
+}
+
 function getHistoryEpisodeLabelFromMeta(meta: Report["meta"]) {
   if (typeof meta.episodeNumber !== "number") {
     return meta.title;
@@ -813,6 +845,7 @@ export default function BangumiLensApp() {
   const [pendingDuplicate, setPendingDuplicate] = useState<SavedReport | null>(null);
   const [pendingAutoAnalyzeUrl, setPendingAutoAnalyzeUrl] = useState("");
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
+  const [pendingReportRegeneration, setPendingReportRegeneration] = useState<PendingReportRegeneration | null>(null);
   const [pendingAiTitleTranslation, setPendingAiTitleTranslation] = useState<PendingAiTitleTranslation | null>(null);
   const [episodeTitleTranslations, setEpisodeTitleTranslations] = useState<Record<string, EpisodeTitleTranslationState>>({});
   const [likeHistoryPrompt, setLikeHistoryPrompt] = useState<LikeHistoryPrompt | null>(null);
@@ -1068,6 +1101,7 @@ export default function BangumiLensApp() {
     setMissingEpisodePrompt(null);
     setPendingDuplicate(null);
     setPendingAutoAnalyzeUrl("");
+    setPendingReportRegeneration(null);
     setPendingAiTitleTranslation(null);
     router.push("/");
   }
@@ -1214,6 +1248,9 @@ export default function BangumiLensApp() {
     return history.find((item) => isSameReportEpisode(item, report));
   }, [history, report]);
   const currentReportLiked = isSavedReportLiked(currentSavedReport);
+  const reportGeneratedAt = report?.generatedAt || currentSavedReport?.savedAt;
+  const reportGeneratedAtLabel = formatReportGeneratedAt(reportGeneratedAt);
+  const reportIsStale = isReportStale(reportGeneratedAt);
   const requestEpisodeTitleTranslation = useCallback(async (meta: Report["meta"], allowAi: boolean) => {
     if (!allowAi && meta.episodeTitleCn?.trim()) return;
     const existingState = episodeTitleTranslations[meta.episodeId];
@@ -1500,6 +1537,21 @@ export default function BangumiLensApp() {
     void runAnalysis(duplicateUrl);
   }
 
+  function regenerateCurrentReport() {
+    if (!report) return;
+    setPendingReportRegeneration({
+      url: report.meta.url,
+      title: getHistoryEpisodeLabel(report)
+    });
+  }
+
+  function confirmReportRegeneration() {
+    if (!pendingReportRegeneration) return;
+    const regenerationUrl = pendingReportRegeneration.url;
+    setPendingReportRegeneration(null);
+    void runAnalysis(regenerationUrl);
+  }
+
   function confirmAutoAnalyze() {
     if (!pendingAutoAnalyzeUrl) return;
     const analysisUrl = pendingAutoAnalyzeUrl;
@@ -1695,6 +1747,18 @@ export default function BangumiLensApp() {
                 translationState={episodeTitleTranslations[report.meta.episodeId]}
                 onRequestTranslation={requestEpisodeTitleTranslation}
               />
+              {reportGeneratedAtLabel ? (
+                <p className="hero-report-meta">
+                  <Clock size={15} />
+                  <span>该报告生成时间 {reportGeneratedAtLabel}</span>
+                  {reportIsStale && !loading ? (
+                    <button type="button" onClick={regenerateCurrentReport}>
+                      <RefreshCw size={14} />
+                      <span>重新生成</span>
+                    </button>
+                  ) : null}
+                </p>
+              ) : null}
             </>
           ) : (
             <>
@@ -2007,6 +2071,24 @@ export default function BangumiLensApp() {
           actions={[
             { label: "取消", onClick: () => setPendingAutoAnalyzeUrl(""), className: "secondary-action" },
             { label: "确认生成", onClick: confirmAutoAnalyze, className: "primary-action" }
+          ]}
+        />
+      ) : null}
+      {pendingReportRegeneration ? (
+        <ConfirmDialog
+          titleId="report-regeneration-title"
+          icon={<RefreshCw size={20} />}
+          label="重新生成"
+          title="确认重新生成这份报告？"
+          description={
+            <>
+              将重新读取公开评论并覆盖当前本地报告「{pendingReportRegeneration.title}」。确认后才会开始分析。
+            </>
+          }
+          onClose={() => setPendingReportRegeneration(null)}
+          actions={[
+            { label: "取消", onClick: () => setPendingReportRegeneration(null), className: "secondary-action" },
+            { label: "确认重新生成", onClick: confirmReportRegeneration, className: "primary-action" }
           ]}
         />
       ) : null}

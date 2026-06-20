@@ -83,6 +83,7 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
 
   assert.equal(report.episodeDetails.length, 0);
   assert.equal(report.productionNotes.length, 0);
+  assert.equal(Number.isFinite(new Date(report.generatedAt).getTime()), true);
   assert.deepEqual(report.discussionHotspots[0].quotes?.[0].reactions, [{ label: "like", count: 2 }]);
   assert.deepEqual(report.resonancePoints[0].quotes?.[0], { text: "legacy string quote" });
   assert.deepEqual(report.stats, {

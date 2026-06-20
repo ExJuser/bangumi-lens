@@ -98,6 +98,7 @@ export type AnalyzeReport = {
   discussionHotspots: ReportItem[];
   resonancePoints: ReportItem[];
   spoilerNotes: string[];
+  generatedAt: string;
   meta: EpisodeMeta;
   stats: {
     commentCount: number;

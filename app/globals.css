@@ -485,6 +485,44 @@ input {
   font-weight: 800;
 }
 
+.hero-report-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.hero-report-meta svg {
+  flex: 0 0 auto;
+  color: var(--accent-dark);
+}
+
+.hero-report-meta button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--accent-dark);
+  cursor: pointer;
+  padding: 3px 9px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.hero-report-meta button:hover {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel-soft));
+}
+
 .hero-report .analyze-box {
   align-self: start;
   margin-top: 34px;

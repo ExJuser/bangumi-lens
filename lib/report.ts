@@ -200,6 +200,7 @@ export function parseReportOutput(outputText: string, meta: EpisodeMeta, comment
     productionNotes: enrichReportItemsWithReactions(parsed.productionNotes, comments),
     discussionHotspots: enrichReportItemsWithReactions(parsed.discussionHotspots, comments),
     resonancePoints: enrichReportItemsWithReactions(parsed.resonancePoints, comments),
+    generatedAt: new Date().toISOString(),
     meta,
     stats: buildReportStats(comments)
   };
