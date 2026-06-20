@@ -1576,7 +1576,7 @@ export default function BangumiLensApp() {
       <aside className="history-sidebar">
         <div className="history-title">
           <span>
-            <History size={16} />
+            <History size={18} />
             最近
           </span>
         </div>
@@ -1594,7 +1594,7 @@ export default function BangumiLensApp() {
                     onClick={() => toggleHistoryGroup(subjectName)}
                   >
                     <span className="history-group-name">
-                      {isCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                      {isCollapsed ? <ChevronRight size={17} /> : <ChevronDown size={17} />}
                       <HoverScrollText className="history-group-label" text={subjectName} />
                     </span>
                     <span className="history-group-count">{items.length}</span>
@@ -1619,7 +1619,7 @@ export default function BangumiLensApp() {
                             <span className="history-item-meta">
                               {liked ? (
                                 <span className="history-like-indicator" title="已喜欢">
-                                  <Heart size={13} fill="currentColor" />
+                                  <Heart size={15} fill="currentColor" />
                                 </span>
                               ) : null}
                               {savedAtLabel ? <span className="history-saved-at">{savedAtLabel}</span> : null}
@@ -1641,7 +1641,7 @@ export default function BangumiLensApp() {
                                   }
                                 }}
                               >
-                                <Heart size={14} fill={liked ? "currentColor" : "none"} />
+                                <Heart size={17} fill={liked ? "currentColor" : "none"} />
                               </span>
                               <span
                                 className="history-delete"
@@ -1660,7 +1660,7 @@ export default function BangumiLensApp() {
                                   }
                                 }}
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={17} />
                               </span>
                             </span>
                           </button>
