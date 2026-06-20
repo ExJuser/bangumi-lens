@@ -33,6 +33,31 @@ test("desktop history sidebar does not shift when page scrolling begins", () => 
   );
 });
 
+test("history sidebar uses a quiet custom scrollbar", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(
+    css,
+    /\.history-sidebar\s*\{[\s\S]*?scrollbar-width:\s*thin;/,
+    "History sidebar should use a thin Firefox scrollbar instead of the wide default"
+  );
+  assert.match(
+    css,
+    /\.history-sidebar::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;/,
+    "History sidebar should use a narrow WebKit scrollbar"
+  );
+  assert.match(
+    css,
+    /\.history-sidebar::-webkit-scrollbar-button\s*\{[\s\S]*?display:\s*none;/,
+    "History sidebar should hide default WebKit scrollbar arrow buttons"
+  );
+  assert.doesNotMatch(
+    css,
+    /\.history-groups::-webkit-scrollbar/,
+    "Mobile horizontal history groups should keep their own native scrollbar behavior"
+  );
+});
+
 test("history action buttons stay above non-interactive metadata", () => {
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
   const historyItemLabelRule = css.match(/\.history-item-label\s*\{[^}]*\}/)?.[0] || "";
