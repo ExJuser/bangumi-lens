@@ -19,6 +19,7 @@ import {
   Sun,
   ThumbsUp
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "./components/confirm-dialog";
 
@@ -91,6 +92,7 @@ type SavedReport = {
 };
 
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
+const REPORT_ROUTE_PREFIX = "/reports/";
 type ThemeMode = "day" | "night";
 type EpisodeDirection = "previous" | "next";
 type MissingEpisodePrompt = {
@@ -527,7 +529,17 @@ function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpi
   return typeof episodeTotal === "number" && episodeTotal > 0 && episodeNumber >= episodeTotal;
 }
 
+function getReportRoute(itemId: string) {
+  return `${REPORT_ROUTE_PREFIX}${encodeURIComponent(itemId)}`;
+}
+
+function getReportIdFromPath(pathname: string) {
+  if (!pathname.startsWith(REPORT_ROUTE_PREFIX)) return "";
+  return decodeURIComponent(pathname.slice(REPORT_ROUTE_PREFIX.length).split("/")[0] || "");
+}
+
 export default function Home() {
+  const router = useRouter();
   const [url, setUrl] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
@@ -544,6 +556,44 @@ export default function Home() {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const autoAnalyzeUrlRef = useRef<string | null>(null);
+  const loadedRouteReportIdRef = useRef<string | null>(null);
+
+  const openSavedReport = useCallback(async (item: SavedReport, options?: { replace?: boolean }) => {
+    try {
+      let nextReport = item.report;
+      let nextUrl = item.url;
+      if (!nextReport) {
+        const response = await fetch(`/api/history?id=${encodeURIComponent(item.id)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { item?: SavedReport & { report: Report } };
+        nextReport = payload.item?.report;
+        nextUrl = payload.item?.url || nextUrl;
+      }
+
+      if (!nextReport) return;
+
+      loadedRouteReportIdRef.current = item.id;
+      setReport(nextReport);
+      setUrl(nextUrl || nextReport.meta.url);
+      setError("");
+      setStreamingText("");
+      setMissingEpisodePrompt(null);
+      setPendingDuplicate(null);
+      setHistory((currentHistory) =>
+        currentHistory.map((historyItem) => (historyItem.id === item.id ? { ...historyItem, report: nextReport } : historyItem))
+      );
+      const route = getReportRoute(item.id);
+      if (window.location.pathname !== route) {
+        if (options?.replace) {
+          router.replace(route);
+        } else {
+          router.push(route);
+        }
+      }
+    } catch {
+      // Opening a saved report can be retried from the history list.
+    }
+  }, [router]);
 
   useEffect(() => {
     async function loadHistory() {
@@ -585,7 +635,7 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [pendingDuplicate]);
+  }, [openSavedReport, pendingDuplicate]);
 
   useEffect(() => {
     if (!pendingAutoAnalyzeUrl) return;
@@ -659,7 +709,7 @@ export default function Home() {
     window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
   }
 
-  function saveReport(nextReport: Report, sourceUrl: string) {
+  const saveReport = useCallback((nextReport: Report, sourceUrl: string) => {
     const nextItem: SavedReport = {
       id: `${nextReport.meta.episodeId}-${Date.now()}`,
       url: sourceUrl,
@@ -682,10 +732,17 @@ export default function Home() {
       .then(async (response) => {
         if (!response.ok) return;
         const payload = (await response.json()) as { history?: SavedReport[] };
-        if (payload.history) setHistory(payload.history);
+        if (payload.history) {
+          setHistory(payload.history);
+          const savedItem = findExistingReport(payload.history, nextReport.meta.url);
+          if (savedItem) {
+            loadedRouteReportIdRef.current = savedItem.id;
+            router.replace(getReportRoute(savedItem.id));
+          }
+        }
       })
       .catch(() => undefined);
-  }
+  }, [router]);
 
   function deleteHistoryItem(itemId: string) {
     let itemToDelete: SavedReport | undefined;
@@ -697,6 +754,8 @@ export default function Home() {
       if (itemToDelete && report?.meta.url === getSavedReportMeta(itemToDelete).url) {
         setReport(null);
         setStreamingText("");
+        loadedRouteReportIdRef.current = null;
+        router.push("/");
       }
 
       return nextHistory;
@@ -802,7 +861,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [saveReport]);
 
   const startAnalysis = useCallback((trimmedUrl: string) => {
     const existingReport = findExistingReport(history, trimmedUrl);
@@ -867,6 +926,33 @@ export default function Home() {
     setPendingAutoAnalyzeUrl(queryUrl);
   }, [historyLoaded, loading]);
 
+  useEffect(() => {
+    if (!historyLoaded) return;
+
+    async function openRouteReport() {
+      const routeReportId = getReportIdFromPath(window.location.pathname);
+      if (!routeReportId) {
+        loadedRouteReportIdRef.current = null;
+        return;
+      }
+
+      if (loadedRouteReportIdRef.current === routeReportId) return;
+      const routeItem = history.find((item) => item.id === routeReportId) || { id: routeReportId } as SavedReport;
+      loadedRouteReportIdRef.current = routeReportId;
+      await openSavedReport(routeItem, { replace: true });
+    }
+
+    void openRouteReport();
+
+    function handlePopState() {
+      loadedRouteReportIdRef.current = null;
+      void openRouteReport();
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [history, historyLoaded, openSavedReport]);
+
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedUrl = url.trim();
@@ -904,32 +990,6 @@ export default function Home() {
     const analysisUrl = pendingAutoAnalyzeUrl;
     setPendingAutoAnalyzeUrl("");
     startAnalysis(analysisUrl);
-  }
-
-  async function openSavedReport(item: SavedReport) {
-    try {
-      let nextReport = item.report;
-      if (!nextReport) {
-        const response = await fetch(`/api/history?id=${encodeURIComponent(item.id)}`, { cache: "no-store" });
-        if (!response.ok) return;
-        const payload = (await response.json()) as { item?: SavedReport & { report: Report } };
-        nextReport = payload.item?.report;
-      }
-
-      if (!nextReport) return;
-
-      setReport(nextReport);
-      setUrl(item.url);
-      setError("");
-      setStreamingText("");
-      setMissingEpisodePrompt(null);
-      setPendingDuplicate(null);
-      setHistory((currentHistory) =>
-        currentHistory.map((historyItem) => (historyItem.id === item.id ? { ...historyItem, report: nextReport } : historyItem))
-      );
-    } catch {
-      // Opening a saved report can be retried from the history list.
-    }
   }
 
   function navigateEpisode(direction: EpisodeDirection) {
