@@ -6,3 +6,4 @@ out
 *.tsbuildinfo
 .superpowers
 data/reports.json
+data
