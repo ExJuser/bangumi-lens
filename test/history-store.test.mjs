@@ -122,3 +122,25 @@ test("history storage migrates legacy data/reports.json without losing entries",
     assert.equal(existsSync(join(dir, "data", "reports", "items", "legacy-1.json")), true);
   });
 });
+
+test("history storage toggles liked episodes and carries the mark across regeneration", async () => {
+  await withTempCwd(async () => {
+    const { saveHistoryReport, readHistoryIndex, updateHistoryReportLike } = loadHistoryStore();
+    const report = makeReport(7);
+
+    let history = await saveHistoryReport(report, report.meta.url);
+    assert.equal(history[0].likedAt, undefined);
+
+    history = await updateHistoryReportLike(history[0].id, true);
+    assert.equal(typeof history[0].likedAt, "string");
+
+    history = await saveHistoryReport({ ...report, episodeSummary: "regenerated" }, report.meta.url);
+    assert.equal(typeof history[0].likedAt, "string");
+
+    history = await updateHistoryReportLike(history[0].id, false);
+    assert.equal(history[0].likedAt, undefined);
+
+    const index = await readHistoryIndex();
+    assert.equal(index[0].likedAt, undefined);
+  });
+});

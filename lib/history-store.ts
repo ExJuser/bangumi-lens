@@ -6,6 +6,7 @@ export type SavedReport = {
   id: string;
   url: string;
   savedAt: string;
+  likedAt?: string;
   report: AnalyzeReport;
 };
 
@@ -13,6 +14,7 @@ export type SavedReportIndexItem = {
   id: string;
   url: string;
   savedAt: string;
+  likedAt?: string;
   reportPath: string;
   meta: AnalyzeReport["meta"];
   stats: AnalyzeReport["stats"];
@@ -47,6 +49,7 @@ function createIndexItem(item: SavedReport): SavedReportIndexItem {
     id: item.id,
     url: item.url,
     savedAt: item.savedAt,
+    likedAt: item.likedAt,
     reportPath: getReportPath(item.id),
     meta: item.report.meta,
     stats: item.report.stats
@@ -113,6 +116,7 @@ export async function readHistoryReport(itemId: string): Promise<SavedReport | u
     id: item.id,
     url: item.url,
     savedAt: item.savedAt,
+    likedAt: item.likedAt,
     report
   };
 }
@@ -129,6 +133,7 @@ export async function saveHistoryReport(report: AnalyzeReport, sourceUrl: string
     id: `${report.meta.episodeId}-${Date.now()}`,
     url: sourceUrl,
     savedAt: new Date().toISOString(),
+    likedAt: currentHistory.find((item) => item.meta.url === report.meta.url)?.likedAt,
     report
   };
   const removedItems = currentHistory.filter((item) => item.meta.url === report.meta.url);
@@ -149,5 +154,21 @@ export async function deleteHistoryReport(itemId: string) {
   const nextHistory = currentHistory.filter((item) => item.id !== itemId);
   await writeHistoryIndex(nextHistory);
   await Promise.all(removedItems.map((item) => rm(getReportFilePath(item.reportPath), { force: true })));
+  return nextHistory;
+}
+
+export async function updateHistoryReportLike(itemId: string, liked: boolean) {
+  const currentHistory = await readHistoryIndex();
+  let found = false;
+  const likedAt = liked ? new Date().toISOString() : undefined;
+  const nextHistory = currentHistory.map((item) => {
+    if (item.id !== itemId) return item;
+    found = true;
+    return likedAt ? { ...item, likedAt } : { ...item, likedAt: undefined };
+  });
+
+  if (!found) return undefined;
+
+  await writeHistoryIndex(nextHistory);
   return nextHistory;
 }

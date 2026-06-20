@@ -212,7 +212,7 @@ input {
 
 .history-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 68px;
+  grid-template-columns: minmax(0, 1fr) 76px;
   align-items: center;
   gap: 6px;
   width: 100%;
@@ -273,19 +273,23 @@ input {
 
 .history-item-meta {
   display: inline-grid;
-  grid-template-columns: auto;
+  grid-template-columns: repeat(2, 24px);
   align-items: center;
+  justify-content: end;
   justify-items: end;
-  width: 68px;
-  min-width: 68px;
+  width: 76px;
+  min-width: 76px;
 }
 
 .history-saved-at,
+.history-like-indicator,
+.history-like,
 .history-delete {
-  grid-area: 1 / 1;
+  grid-row: 1;
 }
 
 .history-saved-at {
+  grid-column: 1 / -1;
   color: var(--muted);
   font-size: 12px;
   line-height: 1;
@@ -295,6 +299,22 @@ input {
   transition: opacity 140ms ease;
 }
 
+.history-like-indicator {
+  grid-column: 1;
+  justify-self: start;
+  color: var(--accent-dark);
+  line-height: 0;
+}
+
+.history-like {
+  grid-column: 1;
+}
+
+.history-delete {
+  grid-column: 2;
+}
+
+.history-like,
 .history-delete {
   display: grid !important;
   flex: 0 0 auto;
@@ -309,17 +329,32 @@ input {
 
 .history-item:hover .history-delete,
 .history-item:focus-visible .history-delete,
-.history-delete:focus-visible {
+.history-delete:focus-visible,
+.history-item:hover .history-like,
+.history-item:focus-visible .history-like,
+.history-like:focus-visible {
   opacity: 1;
 }
 
+.history-like.liked,
+.history-item.liked .history-item-label {
+  color: var(--accent-dark);
+}
+
+.history-item:hover .history-like-indicator,
+.history-item:focus-visible .history-like-indicator,
+.history-item:has(.history-like:focus-visible) .history-like-indicator,
+.history-item:has(.history-delete:focus-visible) .history-like-indicator,
 .history-item:hover .history-saved-at,
 .history-item:focus-visible .history-saved-at,
+.history-item:has(.history-like:focus-visible) .history-saved-at,
 .history-item:has(.history-delete:focus-visible) .history-saved-at {
   opacity: 0;
 }
 
+.history-like:hover,
 .history-delete:hover,
+.history-like:focus-visible,
 .history-delete:focus-visible {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-dark);
@@ -806,6 +841,13 @@ input {
   -webkit-line-clamp: 1;
 }
 
+.recent-like-mark {
+  display: inline-flex;
+  margin-right: 4px;
+  color: var(--accent-dark);
+  vertical-align: -2px;
+}
+
 .recent-shortcut strong {
   color: inherit;
   font-size: 15px;
@@ -891,6 +933,11 @@ input {
 .episode-nav button:disabled:hover {
   border-color: var(--line);
   color: var(--ink);
+}
+
+.episode-nav .episode-like-button.liked {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  color: var(--accent-dark);
 }
 
 .metrics {

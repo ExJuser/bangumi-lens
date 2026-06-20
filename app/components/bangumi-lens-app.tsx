@@ -9,6 +9,7 @@ import {
   Trash2,
   ExternalLink,
   Eye,
+  Heart,
   Home,
   History,
   Loader2,
@@ -89,6 +90,7 @@ type SavedReport = {
   id: string;
   url: string;
   savedAt: string;
+  likedAt?: string;
   reportPath?: string;
   meta: Report["meta"];
   stats: Report["stats"];
@@ -505,6 +507,14 @@ function getSubjectNameFromMeta(meta: Report["meta"]) {
 
 function getSavedReportMeta(item: SavedReport) {
   return item.report?.meta || item.meta;
+}
+
+function isSavedReportLiked(item?: SavedReport | null) {
+  return Boolean(item?.likedAt);
+}
+
+function isSameReportEpisode(item: SavedReport, currentReport: Report) {
+  return getSavedReportMeta(item).url === currentReport.meta.url;
 }
 
 function getEpisodeSortValue(item: SavedReport) {
@@ -992,10 +1002,12 @@ export default function BangumiLensApp() {
   }
 
   const saveReport = useCallback((nextReport: Report, sourceUrl: string) => {
+    const existingLikedAt = history.find((item) => getSavedReportMeta(item).url === nextReport.meta.url)?.likedAt;
     const nextItem: SavedReport = {
       id: `${nextReport.meta.episodeId}-${Date.now()}`,
       url: sourceUrl,
       savedAt: new Date().toISOString(),
+      likedAt: existingLikedAt,
       meta: nextReport.meta,
       stats: nextReport.stats,
       report: nextReport
@@ -1024,7 +1036,33 @@ export default function BangumiLensApp() {
         }
       })
       .catch(() => undefined);
-  }, [router]);
+  }, [history, router]);
+
+  function toggleReportLike(item: SavedReport, liked: boolean) {
+    const nextLikedAt = liked ? new Date().toISOString() : undefined;
+    const previousHistory = history;
+
+    setHistory((currentHistory) =>
+      currentHistory.map((historyItem) =>
+        historyItem.id === item.id ? { ...historyItem, likedAt: nextLikedAt } : historyItem
+      )
+    );
+
+    void fetch("/api/history", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, liked })
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as { history?: SavedReport[] };
+        if (!response.ok) {
+          setHistory(previousHistory);
+          return;
+        }
+        if (payload.history) setHistory(payload.history);
+      })
+      .catch(() => setHistory(previousHistory));
+  }
 
   function deleteHistoryItem(itemId: string) {
     let itemToDelete: SavedReport | undefined;
@@ -1092,6 +1130,11 @@ export default function BangumiLensApp() {
 
   const currentKnownEpisodeTotal = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId]?.episodeTotal : undefined;
   const bangumiSourceUrl = isBangumiEpisodeUrl(url) ? getComparableEpisodeUrl(url) : "";
+  const currentSavedReport = useMemo(() => {
+    if (!report) return undefined;
+    return history.find((item) => isSameReportEpisode(item, report));
+  }, [history, report]);
+  const currentReportLiked = isSavedReportLiked(currentSavedReport);
   const requestEpisodeTitleTranslation = useCallback(async (meta: Report["meta"], allowAi: boolean) => {
     if (!allowAi && meta.episodeTitleCn?.trim()) return;
     const existingState = episodeTitleTranslations[meta.episodeId];
@@ -1478,17 +1521,45 @@ export default function BangumiLensApp() {
                       {items.map((item) => {
                         const meta = getSavedReportMeta(item);
                         const savedAtLabel = formatSavedAt(item.savedAt);
+                        const liked = isSavedReportLiked(item);
 
                         return (
                           <button
-                            className={report?.meta.url === meta.url ? "history-item active" : "history-item"}
+                            className={[report?.meta.url === meta.url ? "history-item active" : "history-item", liked ? "liked" : ""]
+                              .filter(Boolean)
+                              .join(" ")}
                             key={item.id}
                             type="button"
                             onClick={() => void openSavedReport(item)}
                           >
                             <HoverScrollText className="history-item-label" text={getHistoryEpisodeLabelFromMeta(meta)} />
                             <span className="history-item-meta">
+                              {liked ? (
+                                <span className="history-like-indicator" title="已喜欢">
+                                  <Heart size={13} fill="currentColor" />
+                                </span>
+                              ) : null}
                               {savedAtLabel ? <span className="history-saved-at">{savedAtLabel}</span> : null}
+                              <span
+                                className={liked ? "history-like liked" : "history-like"}
+                                role="button"
+                                tabIndex={0}
+                                title={liked ? "取消喜欢" : "标记为喜欢"}
+                                aria-pressed={liked}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleReportLike(item, !liked);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    toggleReportLike(item, !liked);
+                                  }
+                                }}
+                              >
+                                <Heart size={14} fill={liked ? "currentColor" : "none"} />
+                              </span>
                               <span
                                 className="history-delete"
                                 role="button"
@@ -1660,7 +1731,14 @@ export default function BangumiLensApp() {
               <div className="recent-shortcut-list">
                 {history.slice(0, 3).map((item) => (
                   <button className="recent-shortcut" key={item.id} type="button" onClick={() => void openSavedReport(item)}>
-                    <span>{getSubjectNameFromMeta(getSavedReportMeta(item))}</span>
+                    <span>
+                      {isSavedReportLiked(item) ? (
+                        <span className="recent-like-mark" aria-label="已喜欢">
+                          <Heart size={13} fill="currentColor" />
+                        </span>
+                      ) : null}
+                      {getSubjectNameFromMeta(getSavedReportMeta(item))}
+                    </span>
                     <strong>{getHistoryEpisodeLabelFromMeta(getSavedReportMeta(item))}</strong>
                   </button>
                 ))}
@@ -1700,6 +1778,18 @@ export default function BangumiLensApp() {
                   <span>下一集</span>
                   <ChevronRight size={17} />
                 </button>
+                {currentSavedReport ? (
+                  <button
+                    className={currentReportLiked ? "episode-like-button liked" : "episode-like-button"}
+                    type="button"
+                    aria-pressed={currentReportLiked}
+                    onClick={() => toggleReportLike(currentSavedReport, !currentReportLiked)}
+                    title={currentReportLiked ? "取消喜欢本集" : "喜欢本集"}
+                  >
+                    <Heart size={17} fill={currentReportLiked ? "currentColor" : "none"} />
+                    <span>{currentReportLiked ? "已喜欢" : "喜欢本集"}</span>
+                  </button>
+                ) : null}
               </div>
             </div>
             <div className="metrics">

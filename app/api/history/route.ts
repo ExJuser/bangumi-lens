@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { deleteHistoryReport, readHistoryIndex, readHistoryReport, saveHistoryReport } from "@/lib/history-store";
+import {
+  deleteHistoryReport,
+  readHistoryIndex,
+  readHistoryReport,
+  saveHistoryReport,
+  updateHistoryReportLike
+} from "@/lib/history-store";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import type { AnalyzeReport } from "@/lib/types";
 
@@ -85,6 +91,40 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ history });
   } catch (error) {
     await appendAppLog("error", "history.delete.failed", {
+      id: body.id,
+      ...errorFields(error),
+      durationMs: Date.now() - startedAt
+    });
+    throw error;
+  }
+}
+
+export async function PATCH(request: Request) {
+  const body = (await request.json()) as { id?: unknown; liked?: unknown };
+  if (typeof body.id !== "string" || typeof body.liked !== "boolean") {
+    await appendAppLog("warn", "history.like.invalid", { reason: "missing_id_or_liked" });
+    return NextResponse.json({ error: "缺少历史记录 ID 或喜欢状态。" }, { status: 400 });
+  }
+
+  const startedAt = Date.now();
+
+  try {
+    const history = await updateHistoryReportLike(body.id, body.liked);
+    await appendAppLog("info", "history.like.complete", {
+      id: body.id,
+      liked: body.liked,
+      found: Boolean(history),
+      count: history?.length,
+      durationMs: Date.now() - startedAt
+    });
+
+    if (!history) {
+      return NextResponse.json({ error: "未找到本地报告。" }, { status: 404 });
+    }
+
+    return NextResponse.json({ history });
+  } catch (error) {
+    await appendAppLog("error", "history.like.failed", {
       id: body.id,
       ...errorFields(error),
       durationMs: Date.now() - startedAt
