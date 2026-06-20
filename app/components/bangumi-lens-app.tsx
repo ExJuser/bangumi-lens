@@ -160,6 +160,7 @@ function HoverScrollText({ className, text }: { className?: string; text: string
 }
 
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
+const HOME_ROUTE = "/home";
 const REPORT_ROUTE_PREFIX = "/reports/";
 const REPORT_STALE_THRESHOLD_MS = 15 * 24 * 60 * 60 * 1000;
 type ThemeMode = "day" | "night";
@@ -914,6 +915,10 @@ function getReportIdFromPath(pathname: string) {
   return decodeURIComponent(pathname.slice(REPORT_ROUTE_PREFIX.length).split("/")[0] || "");
 }
 
+function isHomePath(pathname: string) {
+  return pathname === HOME_ROUTE || pathname === "/";
+}
+
 function isEpisodeUnavailable(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
   if (direction !== "next") return false;
   if (report.meta.nextEpisodeId !== null) return false;
@@ -1214,7 +1219,7 @@ export default function BangumiLensApp() {
     setPendingReportRegeneration(null);
     setPendingAiTitleTranslation(null);
     setPendingAiSubjectTitleTranslation(null);
-    router.push("/");
+    router.push(HOME_ROUTE);
   }
 
   const saveReport = useCallback((nextReport: Report, sourceUrl: string) => {
@@ -1292,7 +1297,7 @@ export default function BangumiLensApp() {
         setReport(null);
         setStreamingText("");
         loadedRouteReportIdRef.current = null;
-        router.push("/");
+        router.push(HOME_ROUTE);
       }
 
       return nextHistory;
@@ -1952,7 +1957,7 @@ export default function BangumiLensApp() {
 
       <div className="main-content">
       <div className="top-actions">
-        {report || pathname !== "/" ? (
+        {report || !isHomePath(pathname) ? (
           <button className="home-button" type="button" onClick={goHome}>
             <Home size={17} />
             <span>回到首页</span>

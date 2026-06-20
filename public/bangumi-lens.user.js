@@ -12,7 +12,7 @@
 (function () {
   "use strict";
 
-  const APP_URL = "http://localhost:3000/";
+  const APP_URL = "http://localhost:3000/home";
   const BUTTON_ID = "bangumi-lens-analyze-button";
 
   function getEpisodeUrl() {

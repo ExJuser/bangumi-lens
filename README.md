@@ -81,7 +81,7 @@ npm run dev
 然后在浏览器中打开：
 
 ```text
-http://localhost:3000
+http://localhost:3000/home
 ```
 
 默认端口配置在 `config/app.json`：
@@ -105,7 +105,7 @@ https://bgm.tv/ep/123456
 也可以用 URL 参数直接打开并自动分析：
 
 ```text
-http://localhost:3000/?url=https%3A%2F%2Fbgm.tv%2Fep%2F123456
+http://localhost:3000/home?url=https%3A%2F%2Fbgm.tv%2Fep%2F123456
 ```
 
 ## 从 Bangumi 页面打开
@@ -121,7 +121,7 @@ public/bangumi-lens.user.js
 1. 先启动本地服务：`npm run dev`。
 2. 在浏览器的用户脚本管理器中新建脚本，粘贴 `public/bangumi-lens.user.js` 的内容并保存。
 3. 打开任意 Bangumi 章节页，例如 `https://bgm.tv/ep/123456`。
-4. 点击页面标题旁的“Bangumi Lens 分析”按钮，会打开 `http://localhost:3000/?url=...` 并自动进入分析流程。
+4. 点击页面标题旁的“Bangumi Lens 分析”按钮，会打开 `http://localhost:3000/home?url=...` 并自动进入分析流程。
 
 如果你的应用部署在其他地址，修改脚本里的 `APP_URL` 即可。
 
