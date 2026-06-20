@@ -271,6 +271,10 @@ type SeasonReportGenerationState = {
   totalCount: number;
   completedCount: number;
   failedCount: number;
+  initialSavedReportCount: number;
+  savedReportCount: number;
+  requiredReportCount: number;
+  missingReportCount: number;
   currentIndex: number;
   currentLabel?: string;
   streamingText: string;
@@ -741,6 +745,12 @@ function SeasonReportGenerationProgress({
             {generation.failedCount > 0 ? `，失败 ${generation.failedCount}` : ""}
             {generation.currentLabel ? `，当前 ${generation.currentLabel}` : ""}
           </p>
+          <p>
+            已保存 {generation.savedReportCount} 集，至少需要 {generation.requiredReportCount} 集
+            {generation.missingReportCount > 0
+              ? `；还差 ${generation.missingReportCount} 集后再生成整季趋势。`
+              : "；已满足整季趋势生成门槛。"}
+          </p>
         </div>
         {running ? (
           <button className="season-report-cancel" type="button" onClick={onCancel}>
@@ -748,8 +758,18 @@ function SeasonReportGenerationProgress({
           </button>
         ) : null}
       </div>
-      <div className={running ? "season-report-progress-track running" : "season-report-progress-track"} aria-label="全集总结报告生成进度">
-        <i style={{ width: `${percent}%` }} />
+      <div className="season-report-progress-row">
+        <div
+          className={running ? "season-report-progress-track running" : "season-report-progress-track"}
+          aria-label="全集总结报告生成进度"
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={percent}
+          role="progressbar"
+        >
+          <i style={{ width: `${percent}%` }} />
+        </div>
+        <strong className="season-report-progress-percent">{percent}%</strong>
       </div>
       {generation.message ? <p className="season-report-generation-message">{generation.message}</p> : null}
       <div className="season-report-generation-list">
@@ -834,8 +854,10 @@ function SeasonTrendPanel({
           <div>
             <strong>作品趋势还需要更多本地报告</strong>
             <p>
-              已保存 {trends.savedReportCount} 集，至少需要 {trends.requiredReportCount} 集；还差{" "}
-              {trends.missingReportCount} 集后再生成整季趋势。
+              已保存 {trends.savedReportCount} 集，至少需要 {trends.requiredReportCount} 集
+              {trends.missingReportCount > 0
+                ? `；还差 ${trends.missingReportCount} 集后再生成整季趋势。`
+                : "；正在生成整季趋势。"}
             </p>
             <button
               className="season-report-generate-button"
@@ -942,6 +964,10 @@ function getSubjectNameFromMeta(meta: Report["meta"]) {
 
 function getSubjectKeyFromMeta(meta: Report["meta"]) {
   return meta.subjectId ? `id:${meta.subjectId}` : `name:${getSubjectNameFromMeta(meta)}`;
+}
+
+function getSubjectKeyFromSeasonTrend(trends: Pick<SeasonTrendPayload, "subjectId" | "subjectName">) {
+  return trends.subjectId ? `id:${trends.subjectId}` : `name:${trends.subjectName}`;
 }
 
 function getSubjectKey(report: Report) {
@@ -2013,12 +2039,25 @@ export default function BangumiLensApp() {
     seasonReportGenerationAbortRef.current?.abort();
 
     const initialItems = generationPlan.candidates.map((item) => ({ ...item, status: "pending" as const }));
+    const currentSeasonTrend = seasonTrend;
+    const requiredReportCount =
+      currentSeasonTrend &&
+      (currentSeasonTrend.subjectId === report?.meta.subjectId || currentSeasonTrend.subjectName === generationPlan.subjectName)
+        ? currentSeasonTrend.requiredReportCount
+        : generationPlan.episodeTotal
+          ? Math.ceil(generationPlan.episodeTotal / 2)
+          : 2;
+    const initialSavedReportCount = generationPlan.savedReportCount;
     setSeasonReportGeneration({
       subjectKey: generationPlan.subjectKey,
       status: "running",
       totalCount: initialItems.length,
       completedCount: 0,
       failedCount: 0,
+      initialSavedReportCount,
+      savedReportCount: initialSavedReportCount,
+      requiredReportCount,
+      missingReportCount: Math.max(0, requiredReportCount - initialSavedReportCount),
       currentIndex: 0,
       currentLabel: initialItems[0]?.label,
       streamingText: "",
@@ -2062,14 +2101,28 @@ export default function BangumiLensApp() {
 
         await saveReport(nextReport, item.url, { navigate: false });
         completedCount += 1;
+        const savedReportCount = initialSavedReportCount + completedCount;
+        const missingReportCount = Math.max(0, requiredReportCount - savedReportCount);
         setSeasonReportGeneration((current) =>
           current
             ? {
                 ...current,
                 completedCount,
+                savedReportCount,
+                missingReportCount,
                 items: current.items.map((entry) =>
                   entry.id === item.id ? { ...entry, status: "completed" } : entry
                 )
+              }
+            : current
+        );
+        setSeasonTrend((current) =>
+          current && getSubjectKeyFromSeasonTrend(current) === generationPlan.subjectKey
+            ? {
+                ...current,
+                savedReportCount,
+                missingReportCount,
+                available: current.available
               }
             : current
         );

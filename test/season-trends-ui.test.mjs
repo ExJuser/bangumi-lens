@@ -59,6 +59,8 @@ test("season report generation progress shows active in-flight progress", () => 
 
   assert.match(source, /settledCount \+ 0\.45/);
   assert.match(source, /season-report-progress-track running/);
+  assert.match(source, /season-report-progress-percent/);
+  assert.match(source, /role="progressbar"/);
   assert.match(css, /season-report-progress-shine/);
 });
 

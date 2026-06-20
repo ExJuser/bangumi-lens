@@ -1544,6 +1544,13 @@ input {
   color: var(--ink);
 }
 
+.season-report-progress-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
 .season-report-progress-track {
   position: relative;
   overflow: hidden;
@@ -1558,6 +1565,15 @@ input {
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-dark));
   transition: width 180ms ease;
+}
+
+.season-report-progress-percent {
+  min-width: 4ch;
+  color: var(--ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: right;
 }
 
 .season-report-progress-track.running i::after {
