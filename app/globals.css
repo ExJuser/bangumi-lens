@@ -74,10 +74,12 @@ input {
 
 .top-actions {
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
   margin-bottom: 8px;
 }
 
+.home-button,
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -93,6 +95,7 @@ input {
   box-shadow: 0 8px 28px rgba(88, 60, 34, 0.08);
 }
 
+.home-button:hover,
 .theme-toggle:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   color: var(--accent-dark);

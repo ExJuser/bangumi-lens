@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import BangumiLensApp from "./components/bangumi-lens-app";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,7 +10,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <BangumiLensApp>{children}</BangumiLensApp>
+      </body>
     </html>
   );
 }

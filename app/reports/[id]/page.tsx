@@ -1,1 +1,3 @@
-export { default } from "../../page";
+export default function ReportPage() {
+  return null;
+}
