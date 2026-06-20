@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -142,5 +142,30 @@ test("history storage toggles liked episodes and carries the mark across regener
 
     const index = await readHistoryIndex();
     assert.equal(index[0].likedAt, undefined);
+  });
+});
+
+test("history storage rejects index report paths outside the items directory", async () => {
+  await withTempCwd(async (dir) => {
+    const reportsDir = join(dir, "data", "reports");
+    await mkdir(reportsDir, { recursive: true });
+    await writeFile(join(reportsDir, "outside.json"), JSON.stringify(makeReport(9)), "utf8");
+    await writeFile(
+      join(reportsDir, "index.json"),
+      JSON.stringify([
+        {
+          id: "bad-path",
+          url: "https://bgm.tv/ep/9",
+          savedAt: "2026-06-20T00:00:00.000Z",
+          reportPath: "../outside.json",
+          meta: makeReport(9).meta,
+          stats: makeReport(9).stats
+        }
+      ]),
+      "utf8"
+    );
+
+    const { readHistoryReport } = loadHistoryStore();
+    await assert.rejects(() => readHistoryReport("bad-path"), /Invalid report path/);
   });
 });

@@ -36,8 +36,9 @@ function getReportPath(itemId: string) {
 function getReportFilePath(reportPath: string) {
   const resolvedPath = path.resolve(HISTORY_DIR, reportPath);
   const resolvedItemsDir = path.resolve(HISTORY_ITEMS_DIR);
+  const relativePath = path.relative(resolvedItemsDir, resolvedPath);
 
-  if (!resolvedPath.startsWith(`${resolvedItemsDir}${path.sep}`)) {
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath) || relativePath === "") {
     throw new Error("Invalid report path.");
   }
 
@@ -109,6 +110,10 @@ export async function readHistoryReport(itemId: string): Promise<SavedReport | u
   const item = index.find((entry) => entry.id === itemId);
   if (!item) return undefined;
 
+  return readHistoryReportFromIndexItem(item);
+}
+
+async function readHistoryReportFromIndexItem(item: SavedReportIndexItem): Promise<SavedReport | undefined> {
   const report = await readJsonFile<AnalyzeReport>(getReportFilePath(item.reportPath));
   if (!report) return undefined;
 
@@ -123,7 +128,7 @@ export async function readHistoryReport(itemId: string): Promise<SavedReport | u
 
 export async function readHistory(): Promise<SavedReport[]> {
   const index = await readHistoryIndex();
-  const history = await Promise.all(index.map((item) => readHistoryReport(item.id)));
+  const history = await Promise.all(index.map(readHistoryReportFromIndexItem));
   return history.filter((item): item is SavedReport => Boolean(item));
 }
 

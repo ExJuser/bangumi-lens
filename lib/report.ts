@@ -17,49 +17,20 @@ const quoteSchema = z
   ])
   .transform((quote) => (typeof quote === "string" ? { text: quote } : quote));
 
+const reportItemSchema = z.object({
+  title: z.string(),
+  summary: z.string(),
+  quotes: z.array(quoteSchema).default([]),
+  sourceCommentIds: z.array(z.string())
+});
+
 const reportSchema = z.object({
   episodeSummary: z.string(),
   opinionSummary: z.string(),
-  episodeDetails: z
-    .array(
-      z.object({
-        title: z.string(),
-        summary: z.string(),
-        quotes: z.array(quoteSchema).default([]),
-        sourceCommentIds: z.array(z.string())
-      })
-    )
-    .default([]),
-  productionNotes: z
-    .array(
-      z.object({
-        title: z.string(),
-        summary: z.string(),
-        quotes: z.array(quoteSchema).default([]),
-        sourceCommentIds: z.array(z.string())
-      })
-    )
-    .default([]),
-  discussionHotspots: z
-    .array(
-      z.object({
-        title: z.string(),
-        summary: z.string(),
-        quotes: z.array(quoteSchema).default([]),
-        sourceCommentIds: z.array(z.string())
-      })
-    )
-    .default([]),
-  resonancePoints: z
-    .array(
-      z.object({
-        title: z.string(),
-        summary: z.string(),
-        quotes: z.array(quoteSchema).default([]),
-        sourceCommentIds: z.array(z.string())
-      })
-    )
-    .default([]),
+  episodeDetails: z.array(reportItemSchema).default([]),
+  productionNotes: z.array(reportItemSchema).default([]),
+  discussionHotspots: z.array(reportItemSchema).default([]),
+  resonancePoints: z.array(reportItemSchema).default([]),
   spoilerNotes: z.array(z.string()).default([])
 });
 
