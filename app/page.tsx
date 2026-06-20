@@ -536,6 +536,7 @@ export default function Home() {
   const [history, setHistory] = useState<SavedReport[]>([]);
   const [theme, setTheme] = useState<ThemeMode>("day");
   const [pendingDuplicate, setPendingDuplicate] = useState<SavedReport | null>(null);
+  const [pendingAutoAnalyzeUrl, setPendingAutoAnalyzeUrl] = useState("");
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
@@ -585,6 +586,19 @@ export default function Home() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pendingDuplicate]);
+
+  useEffect(() => {
+    if (!pendingAutoAnalyzeUrl) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPendingAutoAnalyzeUrl("");
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pendingAutoAnalyzeUrl]);
 
   useEffect(() => {
     if (!missingEpisodePrompt) return;
@@ -850,8 +864,8 @@ export default function Home() {
 
     autoAnalyzeUrlRef.current = queryUrl;
     setUrl(queryUrl);
-    startAnalysis(queryUrl);
-  }, [historyLoaded, loading, startAnalysis]);
+    setPendingAutoAnalyzeUrl(queryUrl);
+  }, [historyLoaded, loading]);
 
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -883,6 +897,13 @@ export default function Home() {
     const duplicateUrl = url.trim() || pendingDuplicate.url;
     setPendingDuplicate(null);
     void runAnalysis(duplicateUrl);
+  }
+
+  function confirmAutoAnalyze() {
+    if (!pendingAutoAnalyzeUrl) return;
+    const analysisUrl = pendingAutoAnalyzeUrl;
+    setPendingAutoAnalyzeUrl("");
+    startAnalysis(analysisUrl);
   }
 
   async function openSavedReport(item: SavedReport) {
@@ -1286,6 +1307,24 @@ export default function Home() {
           actions={[
             { label: "查看旧报告", onClick: useExistingReport, className: "secondary-action" },
             { label: "重新生成", onClick: regenerateDuplicateReport, className: "primary-action" }
+          ]}
+        />
+      ) : null}
+      {pendingAutoAnalyzeUrl ? (
+        <ConfirmDialog
+          titleId="auto-analyze-title"
+          icon={<Sparkles size={20} />}
+          label="准备分析"
+          title="确认生成这集的 Bangumi Lens 报告"
+          description={
+            <>
+              即将读取公开评论并生成本地报告。确认后才会开始分析，取消会保留当前链接供你稍后手动生成。
+            </>
+          }
+          onClose={() => setPendingAutoAnalyzeUrl("")}
+          actions={[
+            { label: "取消", onClick: () => setPendingAutoAnalyzeUrl(""), className: "secondary-action" },
+            { label: "确认生成", onClick: confirmAutoAnalyze, className: "primary-action" }
           ]}
         />
       ) : null}
