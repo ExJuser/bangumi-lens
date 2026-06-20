@@ -412,18 +412,27 @@ input {
   -webkit-line-clamp: 4;
 }
 
-.hero-report .hero-copy .hero-episode-title {
+.hero-report .hero-copy .hero-episode-title,
+.hero-report .hero-copy .hero-subject-title {
   position: relative;
   display: block;
   overflow: visible;
   outline: none;
 }
 
-.hero-report .hero-copy .hero-episode-title > span:first-child {
+.hero-report .hero-copy .hero-episode-title > span:first-child,
+.hero-report .hero-copy .hero-subject-title > span:first-child {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
+}
+
+.hero-report .hero-copy .hero-episode-title > span:first-child {
   -webkit-line-clamp: 4;
+}
+
+.hero-report .hero-copy .hero-subject-title > span:first-child {
+  -webkit-line-clamp: 2;
 }
 
 .hero-title-translation {
@@ -464,7 +473,10 @@ input {
 
 .hero-episode-title:hover .hero-title-translation,
 .hero-episode-title:focus .hero-title-translation,
-.hero-episode-title:focus-within .hero-title-translation {
+.hero-episode-title:focus-within .hero-title-translation,
+.hero-subject-title:hover .hero-title-translation,
+.hero-subject-title:focus .hero-title-translation,
+.hero-subject-title:focus-within .hero-title-translation {
   opacity: 1;
   transform: translateY(0);
 }

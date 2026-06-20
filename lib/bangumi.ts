@@ -123,6 +123,27 @@ export async function fetchBangumiSubjectInfo(
   }
 }
 
+export async function fetchBangumiSubjectTitleCn(subjectId: string) {
+  configureServerProxy();
+
+  try {
+    const response = await fetch(`https://api.bgm.tv/v0/subjects/${encodeURIComponent(subjectId)}`, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/json"
+      },
+      next: { revalidate: 60 * 60 * 24 }
+    });
+
+    if (!response.ok) return undefined;
+
+    const subject = (await response.json()) as { name_cn?: unknown };
+    return typeof subject.name_cn === "string" && subject.name_cn.trim() ? subject.name_cn.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function summarizeSubjectRating(rating: unknown): EpisodeRating | undefined {
   if (!rating || typeof rating !== "object") return undefined;
 

@@ -191,6 +191,39 @@ export async function translateEpisodeTitle(input: {
   return translatedTitle;
 }
 
+export async function translateSubjectTitle(input: { title: string }) {
+  configureServerProxy();
+
+  const apiKey = requireModelApiKey();
+  const client = createClient(apiKey);
+  const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content:
+          "你是动画标题翻译助手。只把输入的动画标题翻译成自然、简洁的中文标题，不解释，不添加引号，不输出其他内容。"
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          title: input.title
+        })
+      }
+    ],
+    temperature: 0.1
+  });
+
+  const translatedTitle = response.choices[0]?.message.content?.trim().replace(/^["“”「」『』]+|["“”「」『』]+$/g, "");
+  if (!translatedTitle) {
+    throw new Error("模型 API 未返回可用的标题翻译。");
+  }
+
+  return translatedTitle;
+}
+
 export function parseReportOutput(outputText: string, meta: EpisodeMeta, comments: WeightedComment[]): AnalyzeReport {
   const parsed = reportSchema.parse(JSON.parse(outputText));
 
