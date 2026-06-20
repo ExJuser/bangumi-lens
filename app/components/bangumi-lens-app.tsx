@@ -124,7 +124,7 @@ function HoverScrollText({ className, text }: { className?: string; text: string
     return () => resizeObserver.disconnect();
   }, [text]);
 
-  const scrollDuration = scrollDistance > 0 ? Math.max(6000, scrollDistance * 90) : 0;
+  const scrollDuration = scrollDistance > 0 ? Math.max(4500, scrollDistance * 65) : 0;
   const scrollClassName = [className, "hover-scroll-text", scrollDistance > 0 ? "is-overflowing" : ""]
     .filter(Boolean)
     .join(" ");
