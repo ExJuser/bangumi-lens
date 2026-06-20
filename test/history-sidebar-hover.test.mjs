@@ -35,11 +35,13 @@ test("desktop history sidebar does not shift when page scrolling begins", () => 
 
 test("history action buttons stay above non-interactive metadata", () => {
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const historyItemLabelRule = css.match(/\.history-item-label\s*\{[^}]*\}/)?.[0] || "";
 
+  assert.doesNotMatch(historyItemLabelRule, /pointer-events:\s*none;/);
   assert.match(
     css,
-    /\.history-item-label\s*\{[\s\S]*?pointer-events:\s*none;/,
-    "History item labels should not keep a marquee hover layer over action buttons"
+    /\.history-item-label\.hover-scroll-text\.is-overflowing:hover\s+\.hover-scroll-text-inner/,
+    "History item labels should receive hover so overflowing titles can scroll"
   );
   assert.match(
     css,

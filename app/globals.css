@@ -235,7 +235,6 @@ input {
   min-width: 0;
   font-size: 17px;
   line-height: 1.45;
-  pointer-events: none;
 }
 
 .hover-scroll-text {
@@ -257,6 +256,8 @@ input {
 }
 
 .hover-scroll-text.is-overflowing:hover .hover-scroll-text-inner,
+.history-item-label.hover-scroll-text.is-overflowing:hover .hover-scroll-text-inner,
+.history-item-label.hover-scroll-text.is-overflowing:focus-visible .hover-scroll-text-inner,
 .history-group-toggle:hover .hover-scroll-text.is-overflowing .hover-scroll-text-inner,
 .history-group-toggle:focus-visible .hover-scroll-text.is-overflowing .hover-scroll-text-inner {
   max-width: none;
