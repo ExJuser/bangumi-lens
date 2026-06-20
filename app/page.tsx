@@ -154,12 +154,12 @@ function RatingBars({ rating }: { rating: RatingSummary }) {
   return (
     <div className="rating-bars">
       {distribution.map((item) => (
-        <div className="rating-row" key={item.score}>
-          <span>{item.score}</span>
-          <div className="rating-track">
-            <i style={{ width: `${item.percent}%` }} />
-          </div>
+        <div className="rating-column" key={item.score} title={`${item.score} 分：${item.count} 票`}>
           <b>{item.count}</b>
+          <div className="rating-track">
+            <i style={{ height: item.count > 0 ? `${item.percent}%` : 0 }} />
+          </div>
+          <span>{item.score}</span>
         </div>
       ))}
     </div>
