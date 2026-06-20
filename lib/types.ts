@@ -2,6 +2,9 @@ export type EpisodeMeta = {
   url: string;
   episodeId: string;
   episodeNumber?: number;
+  episodeSort?: number;
+  previousEpisodeId?: string | null;
+  nextEpisodeId?: string | null;
   subjectId?: string;
   title: string;
   subjectTitle?: string;

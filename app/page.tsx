@@ -50,6 +50,9 @@ type Report = {
     url: string;
     episodeId: string;
     episodeNumber?: number;
+    episodeSort?: number;
+    previousEpisodeId?: string | null;
+    nextEpisodeId?: string | null;
     subjectId?: string;
     title: string;
     subjectTitle?: string;
@@ -432,6 +435,10 @@ function getSavedReportMeta(item: SavedReport) {
 function getEpisodeSortValue(item: SavedReport) {
   const meta = getSavedReportMeta(item);
 
+  if (typeof meta.episodeSort === "number") {
+    return meta.episodeSort;
+  }
+
   if (typeof meta.episodeNumber === "number") {
     return meta.episodeNumber;
   }
@@ -468,25 +475,47 @@ function getDirectionLabel(direction: EpisodeDirection) {
   return direction === "previous" ? "上一集" : "下一集";
 }
 
-function buildAdjacentEpisodeUrl(report: Report, direction: EpisodeDirection) {
-  const episodeId = Number(report.meta.episodeId);
-  if (!Number.isInteger(episodeId)) return undefined;
-
-  const adjacentEpisodeId = episodeId + (direction === "previous" ? -1 : 1);
-  if (adjacentEpisodeId <= 0) return undefined;
-
+function buildEpisodeUrl(report: Report, episodeId: string) {
   try {
     const url = new URL(report.meta.url);
-    url.pathname = `/ep/${adjacentEpisodeId}`;
+    url.pathname = `/ep/${episodeId}`;
     url.search = "";
     url.hash = "";
     return url.toString();
   } catch {
-    return `https://bgm.tv/ep/${adjacentEpisodeId}`;
+    return `https://bgm.tv/ep/${episodeId}`;
   }
 }
 
+function buildAdjacentEpisodeUrl(report: Report, direction: EpisodeDirection) {
+  const adjacentEpisodeId =
+    direction === "previous" ? report.meta.previousEpisodeId : report.meta.nextEpisodeId;
+  if (adjacentEpisodeId) return buildEpisodeUrl(report, adjacentEpisodeId);
+
+  const episodeId = Number(report.meta.episodeId);
+  if (!Number.isInteger(episodeId)) return undefined;
+
+  const fallbackEpisodeId = episodeId + (direction === "previous" ? -1 : 1);
+  if (fallbackEpisodeId <= 0) return undefined;
+  return buildEpisodeUrl(report, String(fallbackEpisodeId));
+}
+
 function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
+  if (direction === "previous" && report.meta.previousEpisodeId === null) return true;
+  if (direction === "next" && report.meta.nextEpisodeId === null) return true;
+
+  if (direction === "previous" && report.meta.previousEpisodeId === undefined && typeof report.meta.episodeSort === "number") {
+    return report.meta.episodeSort <= 1;
+  }
+
+  if (direction === "next" && report.meta.nextEpisodeId === undefined && typeof report.meta.episodeSort === "number") {
+    const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
+    return typeof episodeTotal === "number" && episodeTotal > 0 && report.meta.episodeSort >= episodeTotal;
+  }
+
+  if (direction === "previous" && report.meta.previousEpisodeId !== undefined) return false;
+  if (direction === "next" && report.meta.nextEpisodeId !== undefined) return false;
+
   const episodeNumber = report.meta.episodeNumber;
   if (typeof episodeNumber !== "number") return false;
 
@@ -888,8 +917,15 @@ export default function Home() {
 
     const step = direction === "previous" ? -1 : 1;
     let target: SavedReport | undefined;
+    const adjacentEpisodeId =
+      direction === "previous" ? report.meta.previousEpisodeId : report.meta.nextEpisodeId;
 
-    if (typeof report.meta.episodeNumber === "number") {
+    if (adjacentEpisodeId) {
+      target = currentSubjectHistory.find((item) => getSavedReportMeta(item).episodeId === adjacentEpisodeId);
+    } else if (typeof report.meta.episodeSort === "number") {
+      const expectedEpisodeSort = report.meta.episodeSort + step;
+      target = currentSubjectHistory.find((item) => getSavedReportMeta(item).episodeSort === expectedEpisodeSort);
+    } else if (typeof report.meta.episodeNumber === "number") {
       const expectedEpisodeNumber = report.meta.episodeNumber + step;
       target = currentSubjectHistory.find((item) => getSavedReportMeta(item).episodeNumber === expectedEpisodeNumber);
     } else {
