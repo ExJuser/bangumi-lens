@@ -216,7 +216,7 @@ input {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+  grid-template-columns: minmax(0, 0.8fr) minmax(520px, 1fr);
   gap: clamp(24px, 4vw, 56px);
   align-items: center;
   min-height: 310px;
@@ -246,7 +246,7 @@ input {
 }
 
 .hero-report {
-  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.62fr);
+  grid-template-columns: minmax(0, 0.85fr) minmax(620px, 0.75fr);
   align-items: end;
   min-height: 240px;
   padding-bottom: 18px;
@@ -305,7 +305,7 @@ input {
 
 .analyze-box {
   width: 100%;
-  max-width: 540px;
+  max-width: 720px;
   padding: 24px;
   align-self: center;
   justify-self: end;
