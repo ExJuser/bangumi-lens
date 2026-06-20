@@ -1,16 +1,32 @@
 import { NextResponse } from "next/server";
-import { deleteHistoryReport, readHistory, saveHistoryReport } from "@/lib/history-store";
+import { deleteHistoryReport, readHistoryIndex, readHistoryReport, saveHistoryReport } from "@/lib/history-store";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import type { AnalyzeReport } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const startedAt = Date.now();
+  const id = new URL(request.url).searchParams.get("id");
 
   try {
-    const history = await readHistory();
+    if (id) {
+      const item = await readHistoryReport(id);
+      await appendAppLog("info", "history.report.read.complete", {
+        id,
+        found: Boolean(item),
+        durationMs: Date.now() - startedAt
+      });
+
+      if (!item) {
+        return NextResponse.json({ error: "未找到本地报告。" }, { status: 404 });
+      }
+
+      return NextResponse.json({ item });
+    }
+
+    const history = await readHistoryIndex();
     await appendAppLog("info", "history.read.complete", {
       count: history.length,
       durationMs: Date.now() - startedAt

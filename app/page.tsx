@@ -80,7 +80,10 @@ type SavedReport = {
   id: string;
   url: string;
   savedAt: string;
-  report: Report;
+  reportPath?: string;
+  meta: Report["meta"];
+  stats: Report["stats"];
+  report?: Report;
 };
 
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
@@ -339,15 +342,25 @@ function ReportSection({
 }
 
 function getSubjectName(report: Report) {
-  return report.meta.subjectTitleCn || report.meta.subjectTitle || "未分类动画";
+  return getSubjectNameFromMeta(report.meta);
+}
+
+function getSubjectNameFromMeta(meta: Report["meta"]) {
+  return meta.subjectTitleCn || meta.subjectTitle || "未分类动画";
+}
+
+function getSavedReportMeta(item: SavedReport) {
+  return item.report?.meta || item.meta;
 }
 
 function getEpisodeSortValue(item: SavedReport) {
-  if (typeof item.report.meta.episodeNumber === "number") {
-    return item.report.meta.episodeNumber;
+  const meta = getSavedReportMeta(item);
+
+  if (typeof meta.episodeNumber === "number") {
+    return meta.episodeNumber;
   }
 
-  const numericId = Number(item.report.meta.episodeId);
+  const numericId = Number(meta.episodeId);
   return Number.isFinite(numericId) ? numericId : Number.MAX_SAFE_INTEGER;
 }
 
@@ -356,11 +369,15 @@ function formatEpisodeNumber(episodeNumber: number) {
 }
 
 function getHistoryEpisodeLabel(report: Report) {
-  if (typeof report.meta.episodeNumber !== "number") {
-    return report.meta.title;
+  return getHistoryEpisodeLabelFromMeta(report.meta);
+}
+
+function getHistoryEpisodeLabelFromMeta(meta: Report["meta"]) {
+  if (typeof meta.episodeNumber !== "number") {
+    return meta.title;
   }
 
-  return `第 ${formatEpisodeNumber(report.meta.episodeNumber)} 话 ${report.meta.title}`;
+  return `第 ${formatEpisodeNumber(meta.episodeNumber)} 话 ${meta.title}`;
 }
 
 function sortSavedReportsByEpisode(items: SavedReport[]) {
@@ -450,11 +467,7 @@ export default function Home() {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setReport(duplicate.report);
-        setUrl(duplicate.url);
-        setError("");
-        setStreamingText("");
-        setPendingDuplicate(null);
+        void openSavedReport(duplicate);
       }
     }
 
@@ -526,12 +539,14 @@ export default function Home() {
       id: `${nextReport.meta.episodeId}-${Date.now()}`,
       url: sourceUrl,
       savedAt: new Date().toISOString(),
+      meta: nextReport.meta,
+      stats: nextReport.stats,
       report: nextReport
     };
 
     setHistory((currentHistory) => {
-      const dedupedHistory = currentHistory.filter((item) => item.report.meta.url !== nextReport.meta.url);
-      return [nextItem, ...dedupedHistory].slice(0, 60);
+      const dedupedHistory = currentHistory.filter((item) => getSavedReportMeta(item).url !== nextReport.meta.url);
+      return [nextItem, ...dedupedHistory];
     });
 
     void fetch("/api/history", {
@@ -554,7 +569,7 @@ export default function Home() {
       itemToDelete = currentHistory.find((item) => item.id === itemId);
       const nextHistory = currentHistory.filter((item) => item.id !== itemId);
 
-      if (itemToDelete && report?.meta.url === itemToDelete.report.meta.url) {
+      if (itemToDelete && report?.meta.url === getSavedReportMeta(itemToDelete).url) {
         setReport(null);
         setStreamingText("");
       }
@@ -585,7 +600,7 @@ export default function Home() {
   const groupedHistory = useMemo(() => {
     const groups = new Map<string, SavedReport[]>();
     history.forEach((item) => {
-      const subjectName = getSubjectName(item.report);
+      const subjectName = getSubjectNameFromMeta(getSavedReportMeta(item));
       groups.set(subjectName, [...(groups.get(subjectName) || []), item]);
     });
     return [...groups.entries()].map(([subjectName, items]) => [
@@ -596,7 +611,7 @@ export default function Home() {
 
   const currentSubjectHistory = useMemo(() => {
     if (!report) return [];
-    return sortSavedReportsByEpisode(history.filter((item) => getSubjectName(item.report) === getSubjectName(report)));
+    return sortSavedReportsByEpisode(history.filter((item) => getSubjectNameFromMeta(getSavedReportMeta(item)) === getSubjectName(report)));
   }, [history, report]);
 
   const currentKnownEpisodeTotal = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId]?.episodeTotal : undefined;
@@ -666,7 +681,7 @@ export default function Home() {
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedUrl = url.trim();
-    const existingReport = history.find((item) => item.url === trimmedUrl || item.report.meta.url === trimmedUrl);
+    const existingReport = history.find((item) => item.url === trimmedUrl || getSavedReportMeta(item).url === trimmedUrl);
     if (existingReport) {
       setPendingDuplicate(existingReport);
       return;
@@ -677,11 +692,7 @@ export default function Home() {
 
   function useExistingReport() {
     if (!pendingDuplicate) return;
-    setReport(pendingDuplicate.report);
-    setUrl(pendingDuplicate.url);
-    setError("");
-    setStreamingText("");
-    setPendingDuplicate(null);
+    void openSavedReport(pendingDuplicate);
   }
 
   function regenerateDuplicateReport() {
@@ -691,12 +702,30 @@ export default function Home() {
     void runAnalysis(duplicateUrl);
   }
 
-  function openSavedReport(item: SavedReport) {
-    setReport(item.report);
-    setUrl(item.url);
-    setError("");
-    setStreamingText("");
-    setMissingEpisodePrompt(null);
+  async function openSavedReport(item: SavedReport) {
+    try {
+      let nextReport = item.report;
+      if (!nextReport) {
+        const response = await fetch(`/api/history?id=${encodeURIComponent(item.id)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { item?: SavedReport & { report: Report } };
+        nextReport = payload.item?.report;
+      }
+
+      if (!nextReport) return;
+
+      setReport(nextReport);
+      setUrl(item.url);
+      setError("");
+      setStreamingText("");
+      setMissingEpisodePrompt(null);
+      setPendingDuplicate(null);
+      setHistory((currentHistory) =>
+        currentHistory.map((historyItem) => (historyItem.id === item.id ? { ...historyItem, report: nextReport } : historyItem))
+      );
+    } catch {
+      // Opening a saved report can be retried from the history list.
+    }
   }
 
   function navigateEpisode(direction: EpisodeDirection) {
@@ -708,14 +737,14 @@ export default function Home() {
 
     if (typeof report.meta.episodeNumber === "number") {
       const expectedEpisodeNumber = report.meta.episodeNumber + step;
-      target = currentSubjectHistory.find((item) => item.report.meta.episodeNumber === expectedEpisodeNumber);
+      target = currentSubjectHistory.find((item) => getSavedReportMeta(item).episodeNumber === expectedEpisodeNumber);
     } else {
-      const currentIndex = currentSubjectHistory.findIndex((item) => item.report.meta.url === report.meta.url);
+      const currentIndex = currentSubjectHistory.findIndex((item) => getSavedReportMeta(item).url === report.meta.url);
       target = currentIndex >= 0 ? currentSubjectHistory[currentIndex + step] : undefined;
     }
 
     if (target) {
-      openSavedReport(target);
+      void openSavedReport(target);
       return;
     }
 
@@ -750,12 +779,12 @@ export default function Home() {
                 <div className="history-items">
                   {items.map((item) => (
                     <button
-                      className={report?.meta.url === item.report.meta.url ? "history-item active" : "history-item"}
+                      className={report?.meta.url === getSavedReportMeta(item).url ? "history-item active" : "history-item"}
                       key={item.id}
                       type="button"
-                      onClick={() => openSavedReport(item)}
+                      onClick={() => void openSavedReport(item)}
                     >
-                      <span>{getHistoryEpisodeLabel(item.report)}</span>
+                      <span>{getHistoryEpisodeLabelFromMeta(getSavedReportMeta(item))}</span>
                       <span
                         className="history-delete"
                         role="button"
@@ -876,9 +905,9 @@ export default function Home() {
             {history.length > 0 ? (
               <div className="recent-shortcut-list">
                 {history.slice(0, 3).map((item) => (
-                  <button className="recent-shortcut" key={item.id} type="button" onClick={() => openSavedReport(item)}>
-                    <span>{getSubjectName(item.report)}</span>
-                    <strong>{getHistoryEpisodeLabel(item.report)}</strong>
+                  <button className="recent-shortcut" key={item.id} type="button" onClick={() => void openSavedReport(item)}>
+                    <span>{getSubjectNameFromMeta(getSavedReportMeta(item))}</span>
+                    <strong>{getHistoryEpisodeLabelFromMeta(getSavedReportMeta(item))}</strong>
                   </button>
                 ))}
               </div>
@@ -1026,8 +1055,8 @@ export default function Home() {
           title="这个章节已经分析过"
           description={
             <>
-              已保存的是《{pendingDuplicate.report.meta.subjectTitleCn || pendingDuplicate.report.meta.subjectTitle || "未分类动画"}》
-              的「{pendingDuplicate.report.meta.title}」。你可以直接查看旧报告，也可以用最新评论重新生成并覆盖旧记录。
+              已保存的是《{getSubjectNameFromMeta(getSavedReportMeta(pendingDuplicate))}》
+              的「{getSavedReportMeta(pendingDuplicate).title}」。你可以直接查看旧报告，也可以用最新评论重新生成并覆盖旧记录。
             </>
           }
           onClose={useExistingReport}
@@ -1072,7 +1101,7 @@ export default function Home() {
           title="确认删除这条历史"
           description={
             <>
-              将从本地历史中删除「{getHistoryEpisodeLabel(deleteHistoryPrompt.report)}」。这个操作不会删除 Bangumi 上的内容。
+              将从本地历史中删除「{getHistoryEpisodeLabelFromMeta(getSavedReportMeta(deleteHistoryPrompt))}」。这个操作不会删除 Bangumi 上的内容。
             </>
           }
           onClose={() => setDeleteHistoryPrompt(null)}
