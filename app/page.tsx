@@ -1022,7 +1022,6 @@ export default function Home() {
               </div>
               {report.meta.subjectTitle ? <p className="hero-subject-title">{report.meta.subjectTitle}</p> : null}
               <h1>{report.meta.title}</h1>
-              <p className="hero-report-note">单集评论区阅读报告</p>
             </>
           ) : (
             <>
