@@ -1,6 +1,13 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
-import type { BangumiComment, BangumiReaction, BangumiReply, EpisodeRating, ScrapedEpisode } from "@/lib/types";
+import type {
+  BangumiComment,
+  BangumiReaction,
+  BangumiReply,
+  EpisodeAvailabilitySignals,
+  EpisodeRating,
+  ScrapedEpisode
+} from "@/lib/types";
 import { configureServerProxy } from "@/lib/proxy";
 import { parseBangumiEpisodeUrl } from "@/lib/url";
 
@@ -49,6 +56,7 @@ type SubjectInfo = {
   titleCn?: string;
   episodeTotal?: number;
   subjectRating?: EpisodeRating;
+  episodes?: EpisodeAvailabilitySignals[];
 };
 
 type BangumiEpisodeApiItem = {
@@ -57,6 +65,9 @@ type BangumiEpisodeApiItem = {
   type?: unknown;
   name?: unknown;
   name_cn?: unknown;
+  airdate?: unknown;
+  duration?: unknown;
+  comment?: unknown;
 };
 
 type EpisodeNavigationInfo = {
@@ -64,6 +75,9 @@ type EpisodeNavigationInfo = {
   previousEpisodeId?: string | null;
   nextEpisodeId?: string | null;
   episodeTitleCn?: string;
+  currentEpisode?: EpisodeAvailabilitySignals;
+  previousEpisode?: EpisodeAvailabilitySignals | null;
+  nextEpisode?: EpisodeAvailabilitySignals | null;
 };
 
 function parseSubjectId($: cheerio.CheerioAPI) {
@@ -71,7 +85,10 @@ function parseSubjectId($: cheerio.CheerioAPI) {
   return href.match(/subject\/(\d+)/)?.[1];
 }
 
-export async function fetchBangumiSubjectInfo(subjectId?: string): Promise<SubjectInfo> {
+export async function fetchBangumiSubjectInfo(
+  subjectId?: string,
+  options: { includeEpisodes?: boolean } = {}
+): Promise<SubjectInfo> {
   if (!subjectId) return {};
 
   try {
@@ -96,7 +113,11 @@ export async function fetchBangumiSubjectInfo(subjectId?: string): Promise<Subje
     const rawEpisodeTotal = Number(subject.total_episodes || subject.eps);
     const episodeTotal = Number.isFinite(rawEpisodeTotal) && rawEpisodeTotal > 0 ? rawEpisodeTotal : undefined;
     const subjectRating = summarizeSubjectRating(subject.rating);
-    return { titleCn, episodeTotal, subjectRating };
+    const subjectInfo: SubjectInfo = { titleCn, episodeTotal, subjectRating };
+    if (options.includeEpisodes) {
+      subjectInfo.episodes = await fetchSubjectMainEpisodes(subjectId);
+    }
+    return subjectInfo;
   } catch {
     return {};
   }
@@ -135,53 +156,82 @@ function summarizeSubjectRating(rating: unknown): EpisodeRating | undefined {
   };
 }
 
+async function fetchSubjectMainEpisodes(subjectId: string): Promise<EpisodeAvailabilitySignals[]> {
+  const episodes: BangumiEpisodeApiItem[] = [];
+  const limit = 100;
+  let offset = 0;
+
+  while (offset < 1000) {
+    const response = await fetch(
+      `https://api.bgm.tv/v0/episodes?subject_id=${subjectId}&type=0&limit=${limit}&offset=${offset}`,
+      {
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "application/json"
+        },
+        next: { revalidate: 60 * 60 * 6 }
+      }
+    );
+
+    if (!response.ok) return [];
+
+    const payload = (await response.json()) as { data?: BangumiEpisodeApiItem[]; total?: unknown };
+    const pageEpisodes = Array.isArray(payload.data) ? payload.data : [];
+    episodes.push(...pageEpisodes);
+
+    const total = Number(payload.total);
+    if (pageEpisodes.length < limit || (Number.isFinite(total) && episodes.length >= total)) break;
+    offset += limit;
+  }
+
+  return episodes
+    .map(normalizeEpisodeApiItem)
+    .filter((episode): episode is EpisodeAvailabilitySignals => Boolean(episode))
+    .sort((a, b) => (a.sort ?? Number.MAX_SAFE_INTEGER) - (b.sort ?? Number.MAX_SAFE_INTEGER) || Number(a.id) - Number(b.id));
+}
+
+function normalizeOptionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeOptionalNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+function normalizeEpisodeApiItem(episode: BangumiEpisodeApiItem): EpisodeAvailabilitySignals | undefined {
+  const id = typeof episode.id === "number" || typeof episode.id === "string" ? String(episode.id) : undefined;
+  if (!id) return undefined;
+
+  const sort = normalizeOptionalNumber(episode.sort);
+  return {
+    id,
+    sort,
+    title: normalizeOptionalString(episode.name),
+    titleCn: normalizeOptionalString(episode.name_cn),
+    airdate: normalizeOptionalString(episode.airdate),
+    duration: normalizeOptionalString(episode.duration),
+    commentCount: normalizeOptionalNumber(episode.comment)
+  };
+}
+
 async function fetchEpisodeNavigationInfo(subjectId: string | undefined, episodeId: string): Promise<EpisodeNavigationInfo> {
   if (!subjectId) return {};
 
   try {
-    const episodes: BangumiEpisodeApiItem[] = [];
-    const limit = 100;
-    let offset = 0;
-
-    while (offset < 1000) {
-      const response = await fetch(
-        `https://api.bgm.tv/v0/episodes?subject_id=${subjectId}&type=0&limit=${limit}&offset=${offset}`,
-        {
-          headers: {
-            "User-Agent": USER_AGENT,
-            Accept: "application/json"
-          },
-          next: { revalidate: 60 * 60 * 24 }
-        }
-      );
-
-      if (!response.ok) return {};
-
-      const payload = (await response.json()) as { data?: BangumiEpisodeApiItem[]; total?: unknown };
-      const pageEpisodes = Array.isArray(payload.data) ? payload.data : [];
-      episodes.push(...pageEpisodes);
-
-      const total = Number(payload.total);
-      if (pageEpisodes.length < limit || (Number.isFinite(total) && episodes.length >= total)) break;
-      offset += limit;
-    }
-
-    const mainEpisodes = episodes
-      .map((episode) => ({
-        id: typeof episode.id === "number" || typeof episode.id === "string" ? String(episode.id) : undefined,
-        sort: Number(episode.sort),
-        titleCn: typeof episode.name_cn === "string" && episode.name_cn.trim() ? episode.name_cn.trim() : undefined
-      }))
-      .filter((episode): episode is { id: string; sort: number; titleCn: string | undefined } => Boolean(episode.id) && Number.isFinite(episode.sort))
-      .sort((a, b) => a.sort - b.sort || Number(a.id) - Number(b.id));
+    const mainEpisodes = await fetchSubjectMainEpisodes(subjectId);
     const currentIndex = mainEpisodes.findIndex((episode) => episode.id === episodeId);
     if (currentIndex < 0) return {};
+    const currentEpisode = mainEpisodes[currentIndex];
 
     return {
-      episodeSort: mainEpisodes[currentIndex].sort,
+      episodeSort: currentEpisode.sort,
       previousEpisodeId: mainEpisodes[currentIndex - 1]?.id ?? null,
       nextEpisodeId: mainEpisodes[currentIndex + 1]?.id ?? null,
-      episodeTitleCn: mainEpisodes[currentIndex].titleCn
+      episodeTitleCn: currentEpisode.titleCn,
+      currentEpisode,
+      previousEpisode: mainEpisodes[currentIndex - 1] ?? null,
+      nextEpisode: mainEpisodes[currentIndex + 1] ?? null
     };
   } catch {
     return {};
@@ -483,6 +533,9 @@ function parseEpisode(
       episodeSort: navigationInfo.episodeSort,
       previousEpisodeId: navigationInfo.previousEpisodeId,
       nextEpisodeId: navigationInfo.nextEpisodeId,
+      currentEpisode: navigationInfo.currentEpisode,
+      previousEpisode: navigationInfo.previousEpisode,
+      nextEpisode: navigationInfo.nextEpisode,
       subjectId,
       title,
       episodeTitleCn: navigationInfo.episodeTitleCn,

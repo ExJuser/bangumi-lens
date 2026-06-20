@@ -25,6 +25,8 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { getEpisodeAvailabilityWarning, type EpisodeAvailabilityWarning } from "@/lib/episode-availability";
+import type { EpisodeAvailabilitySignals } from "@/lib/types";
 import { ConfirmDialog } from "./confirm-dialog";
 
 type ReportItem = {
@@ -58,6 +60,9 @@ type Report = {
     episodeSort?: number;
     previousEpisodeId?: string | null;
     nextEpisodeId?: string | null;
+    currentEpisode?: EpisodeAvailabilitySignals;
+    previousEpisode?: EpisodeAvailabilitySignals | null;
+    nextEpisode?: EpisodeAvailabilitySignals | null;
     subjectId?: string;
     title: string;
     episodeTitleCn?: string;
@@ -157,8 +162,10 @@ type ThemeMode = "day" | "night";
 type EpisodeDirection = "previous" | "next";
 type MissingEpisodePrompt = {
   direction: EpisodeDirection;
-  reason?: "unavailable";
+  reason?: "unavailable" | "unaired";
   url?: string;
+  episode?: EpisodeAvailabilitySignals;
+  warning?: EpisodeAvailabilityWarning;
 };
 type EpisodeTitleTranslationSource = "official" | "ai";
 type EpisodeTitleTranslationState = {
@@ -178,6 +185,7 @@ type PendingAiTitleTranslation = {
 type SubjectInfo = {
   titleCn?: string;
   episodeTotal?: number;
+  episodes?: EpisodeAvailabilitySignals[];
 };
 
 type SearchResult = {
@@ -703,6 +711,42 @@ function buildAdjacentEpisodeUrl(report: Report, direction: EpisodeDirection) {
   return buildEpisodeUrl(report, String(fallbackEpisodeId));
 }
 
+function getSubjectEpisodeById(subjectInfo: SubjectInfo | undefined, episodeId: string | null | undefined) {
+  if (!episodeId) return undefined;
+  return subjectInfo?.episodes?.find((episode) => episode.id === episodeId);
+}
+
+function getAdjacentEpisodeInfo(
+  report: Report,
+  direction: EpisodeDirection,
+  subjectInfo: SubjectInfo | undefined
+) {
+  const adjacentFromReport = direction === "previous" ? report.meta.previousEpisode : report.meta.nextEpisode;
+  if (adjacentFromReport) return adjacentFromReport;
+
+  const adjacentEpisodeId = direction === "previous" ? report.meta.previousEpisodeId : report.meta.nextEpisodeId;
+  const adjacentById = getSubjectEpisodeById(subjectInfo, adjacentEpisodeId);
+  if (adjacentById) return adjacentById;
+
+  const currentSort = report.meta.episodeSort ?? report.meta.episodeNumber;
+  if (typeof currentSort !== "number") return undefined;
+
+  const expectedSort = currentSort + (direction === "previous" ? -1 : 1);
+  return subjectInfo?.episodes?.find((episode) => episode.sort === expectedSort);
+}
+
+function formatEpisodeAirdate(airdate?: string) {
+  if (!airdate) return "";
+  const match = airdate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return airdate;
+  return `${match[1]} 年 ${Number(match[2])} 月 ${Number(match[3])} 日`;
+}
+
+function getMissingEpisodePrimaryActionLabel(prompt: MissingEpisodePrompt) {
+  if (prompt.reason === "unaired") return "仍然生成";
+  return <>生成{getDirectionLabel(prompt.direction)}</>;
+}
+
 function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
   if (direction === "previous" && report.meta.previousEpisodeId === null) return true;
   if (direction === "next" && report.meta.nextEpisodeId === null) {
@@ -955,7 +999,7 @@ export default function BangumiLensApp() {
 
   useEffect(() => {
     const subjectId = report?.meta.subjectId;
-    if (!subjectId || report?.meta.episodeTotal || subjectInfoById[subjectId]) return;
+    if (!subjectId || subjectInfoById[subjectId]) return;
 
     let ignore = false;
     const currentSubjectId = subjectId;
@@ -969,7 +1013,7 @@ export default function BangumiLensApp() {
           setSubjectInfoById((current) => ({ ...current, [currentSubjectId]: payload }));
         }
       } catch {
-        // Boundary detection falls back to local report metadata.
+        // Navigation checks fall back to local report metadata.
       }
     }
 
@@ -1129,6 +1173,7 @@ export default function BangumiLensApp() {
   }, [history, report]);
 
   const currentKnownEpisodeTotal = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId]?.episodeTotal : undefined;
+  const currentSubjectInfo = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId] : undefined;
   const bangumiSourceUrl = isBangumiEpisodeUrl(url) ? getComparableEpisodeUrl(url) : "";
   const currentSavedReport = useMemo(() => {
     if (!report) return undefined;
@@ -1450,6 +1495,19 @@ export default function BangumiLensApp() {
 
     if (target) {
       void openSavedReport(target);
+      return;
+    }
+
+    const adjacentEpisode = getAdjacentEpisodeInfo(report, direction, currentSubjectInfo);
+    const availabilityWarning = getEpisodeAvailabilityWarning(adjacentEpisode);
+    if (direction === "next" && availabilityWarning) {
+      setMissingEpisodePrompt({
+        direction,
+        reason: "unaired",
+        url: buildAdjacentEpisodeUrl(report, direction),
+        episode: adjacentEpisode,
+        warning: availabilityWarning
+      });
       return;
     }
 
@@ -1947,10 +2005,18 @@ export default function BangumiLensApp() {
         <ConfirmDialog
           titleId="missing-episode-title"
           icon={<AlertCircle size={20} />}
-          label={missingEpisodePrompt.reason === "unavailable" ? "章节未开放" : "本地未命中"}
+          label={
+            missingEpisodePrompt.reason === "unavailable"
+              ? "章节未开放"
+              : missingEpisodePrompt.reason === "unaired"
+                ? "可能未播出"
+                : "本地未命中"
+          }
           title={
             missingEpisodePrompt.reason === "unavailable" ? (
               <>还没有可打开的{getDirectionLabel(missingEpisodePrompt.direction)}</>
+            ) : missingEpisodePrompt.reason === "unaired" ? (
+              <>{getDirectionLabel(missingEpisodePrompt.direction)}可能还没有播出</>
             ) : (
               <>还没有{getDirectionLabel(missingEpisodePrompt.direction)}的分析结果</>
             )
@@ -1959,6 +2025,17 @@ export default function BangumiLensApp() {
             missingEpisodePrompt.reason === "unavailable" ? (
               <>
                 这部作品的总话数里还包含后续章节，但 Bangumi 当前没有提供对应章节链接，可能还没有播出或暂未开放。
+              </>
+            ) : missingEpisodePrompt.reason === "unaired" ? (
+              <>
+                Bangumi 已经提供章节链接
+                {missingEpisodePrompt.warning?.airdate
+                  ? `，官方章节日期是 ${formatEpisodeAirdate(missingEpisodePrompt.warning.airdate)}`
+                  : ""}
+                {missingEpisodePrompt.warning?.certainty === "possible"
+                  ? "，但目前还没有评论，可能还没到实际播出时间。"
+                  : "，看起来还没有到播出日期。"}
+                你可以先留在当前报告，或者确认后仍然生成。
               </>
             ) : (
               <>
@@ -1977,7 +2054,7 @@ export default function BangumiLensApp() {
             ...(missingEpisodePrompt.reason !== "unavailable" && missingEpisodePrompt.url
               ? [
                   {
-                    label: <>生成{getDirectionLabel(missingEpisodePrompt.direction)}</>,
+                    label: getMissingEpisodePrimaryActionLabel(missingEpisodePrompt),
                     onClick: generateMissingEpisode,
                     className: "primary-action" as const
                   }

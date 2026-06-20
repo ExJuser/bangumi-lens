@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
   try {
     await appendAppLog("info", "subject-info.request.start", { subjectId });
-    const subjectInfo = await fetchBangumiSubjectInfo(subjectId);
+    const subjectInfo = await fetchBangumiSubjectInfo(subjectId, { includeEpisodes: true });
     await appendAppLog("info", "subject-info.request.complete", {
       subjectId,
       durationMs: Date.now() - startedAt
