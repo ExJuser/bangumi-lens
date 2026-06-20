@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { configureServerProxy } from "@/lib/proxy";
+import { readServerCache, writeServerCache } from "@/lib/server-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +36,8 @@ export type SearchResult = {
 
 const USER_AGENT =
   "BangumiLens/0.1 (+https://github.com/local/bangumi-lens; public episode comment summarizer)";
-const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
+const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SEARCH_CACHE_NAMESPACE = "bangumi-search";
 const cache = new Map<string, { expiresAt: number; results: SearchResult[] }>();
 
 function normalizeQuery(query: string) {
@@ -135,11 +137,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ results: cached.results, cached: true });
   }
 
+  const diskCached = await readServerCache<SearchResult[]>(SEARCH_CACHE_NAMESPACE, normalizedQuery, SEARCH_CACHE_TTL_MS);
+  if (diskCached?.length) {
+    cache.set(normalizedQuery, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, results: diskCached });
+    return NextResponse.json({ results: diskCached, cached: true });
+  }
+
   try {
     configureServerProxy();
     await appendAppLog("info", "search.request.start", { query: normalizedQuery });
     const results = await buildSearchResults(query.trim());
     cache.set(normalizedQuery, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, results });
+    await writeServerCache(SEARCH_CACHE_NAMESPACE, normalizedQuery, results);
     await appendAppLog("info", "search.request.complete", {
       query: normalizedQuery,
       count: results.length,

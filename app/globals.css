@@ -658,7 +658,8 @@ input {
 .search-results {
   display: grid;
   gap: 8px;
-  margin-top: 12px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .search-results button {
@@ -677,7 +678,8 @@ input {
 }
 
 .search-results button:hover,
-.search-results button:focus-visible {
+.search-results button:focus-visible,
+.search-results button.selected {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   color: var(--accent-dark);
   outline: none;
@@ -721,11 +723,13 @@ input {
 }
 
 .episode-choice-panel {
-  margin-top: 12px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
   overflow: hidden;
+  min-height: 0;
 }
 
 .episode-choice-head {
@@ -767,7 +771,7 @@ input {
 .episode-choice-list {
   display: grid;
   gap: 6px;
-  max-height: 280px;
+  min-height: 0;
   overflow: auto;
   padding: 8px;
 }
@@ -810,6 +814,93 @@ input {
   font-style: normal;
   font-weight: 750;
   white-space: nowrap;
+}
+
+.search-selection-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  width: min(920px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.search-selection-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.search-selection-head h2 {
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.search-selection-head button {
+  min-height: 38px;
+  border-radius: 8px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.search-selection-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.search-selection-column {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+.search-selection-column-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+}
+
+.search-selection-column-head strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.search-selection-column-head span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-selection-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  margin: 0;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 18px;
+  text-align: center;
 }
 
 .notice,
@@ -1847,6 +1938,30 @@ input {
   .confirm-actions {
     grid-column: auto;
     flex-direction: column-reverse;
+  }
+
+  .search-selection-modal {
+    max-height: calc(100vh - 32px);
+    padding: 18px;
+  }
+
+  .search-selection-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search-selection-grid {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .search-selection-column {
+    min-height: 220px;
+  }
+
+  .search-results,
+  .episode-choice-list {
+    max-height: 320px;
   }
 
   .metrics {

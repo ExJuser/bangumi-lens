@@ -964,6 +964,18 @@ export default function BangumiLensApp() {
   const returningHomeRef = useRef(false);
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
+  const searchSelectionOpen = searchResults.length > 0 || Boolean(selectedSearchResult);
+  const modalOpen = Boolean(
+    searchSelectionOpen ||
+      pendingDuplicate ||
+      pendingAutoAnalyzeUrl ||
+      pendingReportRegeneration ||
+      pendingAiTitleTranslation ||
+      pendingAiSubjectTitleTranslation ||
+      missingEpisodePrompt ||
+      deleteHistoryPrompt ||
+      likeHistoryPrompt
+  );
 
   const scheduleReportSwitchingEnd = useCallback(() => {
     if (reportSwitchingFrameRef.current !== null) {
@@ -994,6 +1006,17 @@ export default function BangumiLensApp() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [modalOpen]);
 
   const openSavedReport = useCallback(async (item: SavedReport, options?: { replace?: boolean }) => {
     const currentReportUrl = report?.meta.url;
@@ -1106,6 +1129,19 @@ export default function BangumiLensApp() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pendingAutoAnalyzeUrl]);
+
+  useEffect(() => {
+    if (!searchSelectionOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeSearchSelectionDialog();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [searchSelectionOpen]);
 
   useEffect(() => {
     if (!missingEpisodePrompt) return;
@@ -1736,6 +1772,10 @@ export default function BangumiLensApp() {
         setSubjectInfoById((current) => ({ ...current, [result.subjectId]: payload }));
       }
 
+      if (subjectInfo) {
+        setSubjectInfoById((current) => ({ ...current, [result.subjectId]: subjectInfo }));
+      }
+
       const episodes = (subjectInfo?.episodes || []).map((episode) => ({
         ...episode,
         url: buildSearchEpisodeUrl(episode.id)
@@ -1758,6 +1798,13 @@ export default function BangumiLensApp() {
     setSearchEpisodes([]);
     setUrl(episode.url);
     startAnalysis(episode.url);
+  }
+
+  function closeSearchSelectionDialog() {
+    setSearchResults([]);
+    setSelectedSearchResult(null);
+    setSearchEpisodes([]);
+    setLoadingSearchEpisodes(false);
   }
 
   function useExistingReport() {
@@ -2040,40 +2087,6 @@ export default function BangumiLensApp() {
               <span>{loading ? "分析中" : searching ? "搜索中" : isBangumiEpisodeUrl(url) ? "生成" : "搜索"}</span>
             </button>
           </div>
-          {searchResults.length > 0 ? (
-            <div className="search-results" aria-label="搜索结果">
-              {searchResults.map((result) => (
-                <button key={`${result.subjectId}-${result.firstEpisodeId}`} type="button" onClick={() => selectSearchResult(result)}>
-                  <span>{getSearchResultTitle(result)}</span>
-                  <strong>{getSearchResultSubtitle(result)}</strong>
-                  {result.episodeTotal ? <em>全 {result.episodeTotal} 话</em> : null}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {selectedSearchResult ? (
-            <div className="episode-choice-panel" aria-label="章节选择">
-              <div className="episode-choice-head">
-                <span>选择章节</span>
-                <strong>{getSearchResultTitle(selectedSearchResult)}</strong>
-              </div>
-              {loadingSearchEpisodes ? (
-                <p className="episode-choice-loading">
-                  <Loader2 className="spin" size={16} />
-                  正在加载章节列表
-                </p>
-              ) : (
-                <div className="episode-choice-list">
-                  {searchEpisodes.map((episode) => (
-                    <button key={episode.id} type="button" onClick={() => selectSearchEpisode(episode)}>
-                      <span>{getEpisodeChoiceLabel(episode)}</span>
-                      {episode.airdate ? <em>{episode.airdate}</em> : null}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
           <p className="hint">输入作品名会先搜索 Bangumi 条目；确认作品后再选择具体话数。已有本地报告会在选中章节后提示查看或重新生成。</p>
         </form>
       </section>
@@ -2299,6 +2312,76 @@ export default function BangumiLensApp() {
         </section>
       ) : null}
 
+      {searchSelectionOpen ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeSearchSelectionDialog}>
+          <section
+            aria-labelledby="search-selection-title"
+            aria-modal="true"
+            className="search-selection-modal"
+            role="dialog"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="search-selection-head">
+              <div>
+                <span className="label">搜索结果</span>
+                <h2 id="search-selection-title">选择作品和章节</h2>
+              </div>
+              <button className="secondary-action" type="button" onClick={closeSearchSelectionDialog}>
+                关闭
+              </button>
+            </div>
+            <div className="search-selection-grid">
+              <section className="search-selection-column" aria-label="作品选择">
+                <div className="search-selection-column-head">
+                  <strong>作品</strong>
+                  <span>{searchResults.length} 个结果</span>
+                </div>
+                <div className="search-results" aria-label="搜索结果">
+                  {searchResults.map((result) => (
+                    <button
+                      className={selectedSearchResult?.subjectId === result.subjectId ? "selected" : ""}
+                      key={`${result.subjectId}-${result.firstEpisodeId}`}
+                      type="button"
+                      onClick={() => selectSearchResult(result)}
+                    >
+                      <span>{getSearchResultTitle(result)}</span>
+                      <strong>{getSearchResultSubtitle(result)}</strong>
+                      {result.episodeTotal ? <em>全 {result.episodeTotal} 话</em> : null}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="search-selection-column" aria-label="章节选择">
+                <div className="search-selection-column-head">
+                  <strong>章节</strong>
+                  <span>{selectedSearchResult ? getSearchResultTitle(selectedSearchResult) : "先选择作品"}</span>
+                </div>
+                {selectedSearchResult ? (
+                  <div className="episode-choice-panel" aria-label="章节选择">
+                    {loadingSearchEpisodes ? (
+                      <p className="episode-choice-loading">
+                        <Loader2 className="spin" size={16} />
+                        正在加载章节列表
+                      </p>
+                    ) : (
+                      <div className="episode-choice-list">
+                        {searchEpisodes.map((episode) => (
+                          <button key={episode.id} type="button" onClick={() => selectSearchEpisode(episode)}>
+                            <span>{getEpisodeChoiceLabel(episode)}</span>
+                            {episode.airdate ? <em>{episode.airdate}</em> : null}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="search-selection-empty">选择左侧作品后，会在这里显示可生成报告的具体话数。</p>
+                )}
+              </section>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {pendingDuplicate ? (
         <ConfirmDialog
           titleId="duplicate-title"
