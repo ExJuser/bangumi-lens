@@ -124,7 +124,7 @@ function enrichReportItemsWithReactions(items: ReportItem[], comments: WeightedC
 function requireReportInputs(comments: WeightedComment[]) {
   const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error("缺少 DEEPSEEK_API_KEY，无法生成 AI 摘要。请在 .env.local 中配置后重试。");
+    throw new Error("缺少 DEEPSEEK_API_KEY，无法生成 AI 摘要。请在 config/.env.local 中配置后重试。");
   }
 
   if (comments.length === 0) {
@@ -146,7 +146,7 @@ function createClient(apiKey: string) {
 function requireModelApiKey() {
   const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error("缺少 DEEPSEEK_API_KEY，无法调用模型 API。请在 .env.local 中配置后重试。");
+    throw new Error("缺少 DEEPSEEK_API_KEY，无法调用模型 API。请在 config/.env.local 中配置后重试。");
   }
 
   return apiKey;

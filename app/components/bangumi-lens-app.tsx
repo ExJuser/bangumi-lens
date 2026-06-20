@@ -155,6 +155,7 @@ type ThemeMode = "day" | "night";
 type EpisodeDirection = "previous" | "next";
 type MissingEpisodePrompt = {
   direction: EpisodeDirection;
+  reason?: "unavailable";
   url?: string;
 };
 type EpisodeTitleTranslationSource = "official" | "ai";
@@ -694,7 +695,11 @@ function buildAdjacentEpisodeUrl(report: Report, direction: EpisodeDirection) {
 
 function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
   if (direction === "previous" && report.meta.previousEpisodeId === null) return true;
-  if (direction === "next" && report.meta.nextEpisodeId === null) return true;
+  if (direction === "next" && report.meta.nextEpisodeId === null) {
+    const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
+    const episodeSort = report.meta.episodeSort ?? report.meta.episodeNumber;
+    return !(typeof episodeTotal === "number" && episodeTotal > 0 && typeof episodeSort === "number" && episodeSort < episodeTotal);
+  }
 
   if (direction === "previous" && report.meta.previousEpisodeId === undefined && typeof report.meta.episodeSort === "number") {
     return report.meta.episodeSort <= 1;
@@ -726,6 +731,15 @@ function getReportRoute(itemId: string) {
 function getReportIdFromPath(pathname: string) {
   if (!pathname.startsWith(REPORT_ROUTE_PREFIX)) return "";
   return decodeURIComponent(pathname.slice(REPORT_ROUTE_PREFIX.length).split("/")[0] || "");
+}
+
+function isEpisodeUnavailable(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
+  if (direction !== "next") return false;
+  if (report.meta.nextEpisodeId !== null) return false;
+
+  const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
+  const episodeSort = report.meta.episodeSort ?? report.meta.episodeNumber;
+  return typeof episodeTotal === "number" && episodeTotal > 0 && typeof episodeSort === "number" && episodeSort < episodeTotal;
 }
 
 export default function BangumiLensApp() {
@@ -1396,6 +1410,13 @@ export default function BangumiLensApp() {
       return;
     }
 
+    if (isEpisodeUnavailable(report, direction, currentKnownEpisodeTotal)) {
+      setMissingEpisodePrompt({
+        direction,
+        reason: "unavailable"
+      });
+      return;
+    }
 
     setMissingEpisodePrompt({
       direction,
@@ -1836,26 +1857,43 @@ export default function BangumiLensApp() {
         <ConfirmDialog
           titleId="missing-episode-title"
           icon={<AlertCircle size={20} />}
-          label="?????"
-          title={<>???{getDirectionLabel(missingEpisodePrompt.direction)}?????</>}
+          label={missingEpisodePrompt.reason === "unavailable" ? "章节未开放" : "本地未命中"}
+          title={
+            missingEpisodePrompt.reason === "unavailable" ? (
+              <>还没有可打开的{getDirectionLabel(missingEpisodePrompt.direction)}</>
+            ) : (
+              <>还没有{getDirectionLabel(missingEpisodePrompt.direction)}的分析结果</>
+            )
+          }
           description={
-            <>
-              ????????????????????????????????{getDirectionLabel(missingEpisodePrompt.direction)}
-              ??????
-            </>
+            missingEpisodePrompt.reason === "unavailable" ? (
+              <>
+                这部作品的总话数里还包含后续章节，但 Bangumi 当前没有提供对应章节链接，可能还没有播出或暂未开放。
+              </>
+            ) : (
+              <>
+                本地没有保存对应章节的报告。你可以先留在当前报告，也可以现在生成{getDirectionLabel(missingEpisodePrompt.direction)}
+                的分析结果。
+              </>
+            )
           }
           onClose={() => setMissingEpisodePrompt(null)}
           actions={[
-            { label: "????", onClick: () => setMissingEpisodePrompt(null), className: "secondary-action" },
-            ...(missingEpisodePrompt.url
+            {
+              label: missingEpisodePrompt.reason === "unavailable" ? "知道了" : "暂不生成",
+              onClick: () => setMissingEpisodePrompt(null),
+              className: "secondary-action"
+            },
+            ...(missingEpisodePrompt.reason !== "unavailable" && missingEpisodePrompt.url
               ? [
                   {
-                    label: <>??{getDirectionLabel(missingEpisodePrompt.direction)}</>,
+                    label: <>生成{getDirectionLabel(missingEpisodePrompt.direction)}</>,
                     onClick: generateMissingEpisode,
                     className: "primary-action" as const
                   }
                 ]
-              : [])          ]}
+              : [])
+          ]}
         />
       ) : null}
       {deleteHistoryPrompt ? (

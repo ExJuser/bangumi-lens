@@ -19,12 +19,19 @@ if not exist node_modules (
   )
 )
 
-echo Checking port 3000...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing http://localhost:3000 -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }"
+for /f "usebackq delims=" %%P in (`node scripts\dev-server.mjs print-port 2^>nul`) do set "APP_PORT=%%P"
+if not defined APP_PORT (
+  echo Failed to read dev server port from config\app.json.
+  pause
+  exit /b 1
+)
+
+echo Checking port %APP_PORT%...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing http://localhost:%APP_PORT% -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }"
 if not errorlevel 1 (
   echo.
   echo Bangumi Lens is already running:
-  echo http://localhost:3000
+  echo http://localhost:%APP_PORT%
   echo.
   echo You can close this window. The existing server process is still running.
   pause
@@ -33,7 +40,7 @@ if not errorlevel 1 (
 
 echo.
 echo Starting Bangumi Lens...
-echo URL: http://localhost:3000
+echo URL: http://localhost:%APP_PORT%
 echo Logs:
 echo   %~dp0logs\dev-server.log
 echo   %~dp0logs\dev-server.err.log
@@ -52,7 +59,7 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 call :trim_log "%STDOUT_LOG%"
 call :trim_log "%STDERR_LOG%"
 
-call npm.cmd run dev -- -p 3000 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+call npm.cmd run dev 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
 
 echo.
 echo Server stopped or failed to start.

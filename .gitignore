@@ -1,9 +1,16 @@
 node_modules
 .next
 out
+.env
+.env.*
 .env*.local
+config/.env.local
+!config/.env.example
 *.log
+logs/
 *.tsbuildinfo
 .superpowers
+.agents/
+.codex/
 data/reports.json
 data

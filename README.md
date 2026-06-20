@@ -61,10 +61,10 @@ npm install
 复制环境变量示例文件：
 
 ```bash
-copy .env.example .env.local
+copy config\.env.example config\.env.local
 ```
 
-在 `.env.local` 中填入 DeepSeek API Key：
+在 `config/.env.local` 中填入 DeepSeek API Key：
 
 ```bash
 DEEPSEEK_API_KEY=sk-your-deepseek-api-key
@@ -83,6 +83,18 @@ npm run dev
 ```text
 http://localhost:3000
 ```
+
+默认端口配置在 `config/app.json`：
+
+```json
+{
+  "server": {
+    "port": 3000
+  }
+}
+```
+
+修改端口后需要重启开发服务器，并打开对应的新地址。
 
 输入 Bangumi 章节链接，例如：
 
@@ -113,6 +125,8 @@ public/bangumi-lens.user.js
 
 如果你的应用部署在其他地址，修改脚本里的 `APP_URL` 即可。
 
+如果你修改了 `config/app.json` 里的本地端口，也需要把 `public/bangumi-lens.user.js` 中的 `APP_URL` 同步改成相同地址。
+
 ## 环境变量
 
 | 变量 | 必填 | 默认值 | 说明 |
@@ -122,13 +136,21 @@ public/bangumi-lens.user.js
 | `DEEPSEEK_BASE_URL` | 否 | `https://api.deepseek.com` | DeepSeek API 地址。 |
 | `BANGUMI_LENS_PROXY` | 否 | 无 | 服务端请求 Bangumi、评分接口和模型 API 时使用的 HTTP/HTTPS 代理。 |
 
-如果 Windows 浏览器可以访问外网，但应用生成时提示 `fetch failed`，通常是 Node.js 没有读取系统代理。可以在 `.env.local` 中加入：
+如果 Windows 浏览器可以访问外网，但应用生成时提示 `fetch failed`，通常是 Node.js 没有读取系统代理。可以在 `config/.env.local` 中加入：
 
 ```bash
 BANGUMI_LENS_PROXY=http://127.0.0.1:7897
 ```
 
 请按你本机代理软件的实际端口调整地址。
+
+## 应用配置
+
+本地开发服务器端口放在 `config/app.json`：
+
+- `server.port`：`npm run dev`、`npm run start` 和 `run-dev.cmd` 使用的本地端口，默认 `3000`。
+
+修改该文件后需要重启开发服务器。用户脚本 `public/bangumi-lens.user.js` 运行在浏览器页面里，不能直接读取本地配置文件；改端口后请同步修改脚本中的 `APP_URL`。
 
 ## 提示词配置
 
@@ -218,7 +240,7 @@ npm run lint
 
 ### 提示缺少 `DEEPSEEK_API_KEY`
 
-请确认 `.env.local` 存在，并且已经配置：
+请确认 `config/.env.local` 存在，并且已经配置：
 
 ```bash
 DEEPSEEK_API_KEY=sk-your-deepseek-api-key

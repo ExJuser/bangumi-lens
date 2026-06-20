@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node scripts/dev-server.mjs dev",
+    "build": "node scripts/dev-server.mjs build",
+    "start": "node scripts/dev-server.mjs start",
     "test": "node --test",
-    "lint": "next lint"
+    "lint": "node scripts/dev-server.mjs lint"
   },
   "dependencies": {
     "cheerio": "^1.1.2",
