@@ -22,7 +22,7 @@ import {
   ThumbsUp
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ConfirmDialog } from "./confirm-dialog";
 
@@ -93,6 +93,60 @@ type SavedReport = {
   stats: Report["stats"];
   report?: Report;
 };
+
+function HoverScrollText({ className, text }: { className?: string; text: string }) {
+  const viewportRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [scrollDistance, setScrollDistance] = useState(0);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const textElement = textRef.current;
+    if (!viewport || !textElement) return;
+
+    function measure() {
+      const currentViewport = viewportRef.current;
+      const currentTextElement = textRef.current;
+      if (!currentViewport || !currentTextElement) return;
+      setScrollDistance(Math.max(0, currentTextElement.scrollWidth - currentViewport.clientWidth));
+    }
+
+    measure();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(viewport);
+    resizeObserver.observe(textElement);
+    return () => resizeObserver.disconnect();
+  }, [text]);
+
+  const scrollDuration = scrollDistance > 0 ? Math.max(6000, scrollDistance * 90) : 0;
+  const scrollClassName = [className, "hover-scroll-text", scrollDistance > 0 ? "is-overflowing" : ""]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <span
+      className={scrollClassName}
+      ref={viewportRef}
+      style={
+        {
+          "--scroll-distance": `${scrollDistance}px`,
+          "--scroll-duration": `${scrollDuration}ms`
+        } as CSSProperties
+      }
+      title={text}
+    >
+      <span className="hover-scroll-text-inner" ref={textRef}>
+        {text}
+      </span>
+    </span>
+  );
+}
 
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
 const REPORT_ROUTE_PREFIX = "/reports/";
@@ -601,6 +655,7 @@ export default function BangumiLensApp() {
   const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(() => new Set());
   const autoAnalyzeUrlRef = useRef<string | null>(null);
   const loadedRouteReportIdRef = useRef<string | null>(null);
+  const returningHomeRef = useRef(false);
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
 
@@ -798,6 +853,7 @@ export default function BangumiLensApp() {
   }
 
   function goHome() {
+    returningHomeRef.current = true;
     loadedRouteReportIdRef.current = null;
     setReport(null);
     setError("");
@@ -1042,8 +1098,17 @@ export default function BangumiLensApp() {
 
     async function openRouteReport() {
       const routeReportId = getReportIdFromPath(pathname);
+      if (returningHomeRef.current) {
+        loadedRouteReportIdRef.current = null;
+        if (!routeReportId) {
+          returningHomeRef.current = false;
+        }
+        return;
+      }
+
       if (!routeReportId) {
         loadedRouteReportIdRef.current = null;
+        setReport(null);
         return;
       }
 
@@ -1172,7 +1237,7 @@ export default function BangumiLensApp() {
                   >
                     <span className="history-group-name">
                       {isCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
-                      <span>{subjectName}</span>
+                      <HoverScrollText className="history-group-label" text={subjectName} />
                     </span>
                     <span className="history-group-count">{items.length}</span>
                   </button>
@@ -1189,7 +1254,7 @@ export default function BangumiLensApp() {
                             type="button"
                             onClick={() => void openSavedReport(item)}
                           >
-                            <span className="history-item-label">{getHistoryEpisodeLabelFromMeta(meta)}</span>
+                            <HoverScrollText className="history-item-label" text={getHistoryEpisodeLabelFromMeta(meta)} />
                             <span className="history-item-meta">
                               {savedAtLabel ? <span className="history-saved-at">{savedAtLabel}</span> : null}
                               <span
