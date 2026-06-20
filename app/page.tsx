@@ -199,16 +199,17 @@ function RatingMetric({
   rating?: Report["meta"]["rating"];
   subjectRating?: Report["meta"]["subjectRating"];
 }) {
-  if (!rating) return null;
+  const primaryRating = rating ?? subjectRating;
+  if (!primaryRating) return null;
 
   return (
     <div className="metric rating-metric" tabIndex={0}>
       <div className="rating-score-row">
         <span>
           <Star size={18} />
-          {rating.average.toFixed(1)}
+          {primaryRating.average.toFixed(1)}
         </span>
-        {subjectRating ? (
+        {rating && subjectRating ? (
           <em className="subject-rating-score">
             <Star size={15} />
             {subjectRating.average.toFixed(1)}
@@ -216,17 +217,19 @@ function RatingMetric({
         ) : null}
       </div>
       <p>
-        单集 {rating.voteCount} 票
-        {subjectRating ? ` / 全集 ${formatMetricValue(subjectRating.voteCount)} 票` : ""}
+        {rating ? `单集 ${rating.voteCount} 票` : `全集 ${formatMetricValue(primaryRating.voteCount)} 票`}
+        {rating && subjectRating ? ` / 全集 ${formatMetricValue(subjectRating.voteCount)} 票` : ""}
       </p>
       <div className="rating-popover" role="tooltip">
-        <div className="rating-popover-section">
-          <div className="rating-popover-head">
-            <strong>单集评分分布</strong>
-            <em>{rating.voteCount} 票</em>
+        {rating ? (
+          <div className="rating-popover-section">
+            <div className="rating-popover-head">
+              <strong>单集评分分布</strong>
+              <em>{rating.voteCount} 票</em>
+            </div>
+            <RatingBars rating={rating} />
           </div>
-          <RatingBars rating={rating} />
-        </div>
+        ) : null}
         {subjectRating ? (
           <div className="rating-popover-section">
             <div className="rating-popover-head">
