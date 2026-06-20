@@ -181,6 +181,10 @@ type PendingAiTitleTranslation = {
   subjectTitleCn?: string;
   episodeNumber?: number;
 };
+type LikeHistoryPrompt = {
+  item: SavedReport;
+  liked: boolean;
+};
 
 type SubjectInfo = {
   titleCn?: string;
@@ -811,6 +815,7 @@ export default function BangumiLensApp() {
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
   const [pendingAiTitleTranslation, setPendingAiTitleTranslation] = useState<PendingAiTitleTranslation | null>(null);
   const [episodeTitleTranslations, setEpisodeTitleTranslations] = useState<Record<string, EpisodeTitleTranslationState>>({});
+  const [likeHistoryPrompt, setLikeHistoryPrompt] = useState<LikeHistoryPrompt | null>(null);
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -985,6 +990,19 @@ export default function BangumiLensApp() {
   }, [deleteHistoryPrompt]);
 
   useEffect(() => {
+    if (!likeHistoryPrompt) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setLikeHistoryPrompt(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [likeHistoryPrompt]);
+
+  useEffect(() => {
     if (!pendingAiTitleTranslation) return;
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -1143,6 +1161,13 @@ export default function BangumiLensApp() {
     const itemId = deleteHistoryPrompt.id;
     setDeleteHistoryPrompt(null);
     deleteHistoryItem(itemId);
+  }
+
+  function confirmLikeHistoryItem() {
+    if (!likeHistoryPrompt) return;
+    const { item, liked } = likeHistoryPrompt;
+    setLikeHistoryPrompt(null);
+    toggleReportLike(item, liked);
   }
 
   const groupedHistory = useMemo(() => {
@@ -1837,16 +1862,27 @@ export default function BangumiLensApp() {
                   <ChevronRight size={17} />
                 </button>
                 {currentSavedReport ? (
-                  <button
-                    className={currentReportLiked ? "episode-like-button liked" : "episode-like-button"}
-                    type="button"
-                    aria-pressed={currentReportLiked}
-                    onClick={() => toggleReportLike(currentSavedReport, !currentReportLiked)}
-                    title={currentReportLiked ? "取消喜欢本集" : "喜欢本集"}
-                  >
-                    <Heart size={17} fill={currentReportLiked ? "currentColor" : "none"} />
-                    <span>{currentReportLiked ? "已喜欢" : "喜欢本集"}</span>
-                  </button>
+                  <>
+                    <button
+                      className={currentReportLiked ? "episode-like-button liked" : "episode-like-button"}
+                      type="button"
+                      aria-pressed={currentReportLiked}
+                      onClick={() => setLikeHistoryPrompt({ item: currentSavedReport, liked: !currentReportLiked })}
+                      title={currentReportLiked ? "取消喜欢本集" : "喜欢本集"}
+                    >
+                      <Heart size={17} fill={currentReportLiked ? "currentColor" : "none"} />
+                      <span>{currentReportLiked ? "已喜欢" : "喜欢本集"}</span>
+                    </button>
+                    <button
+                      className="episode-delete-button"
+                      type="button"
+                      onClick={() => setDeleteHistoryPrompt(currentSavedReport)}
+                      title="删除本集记录"
+                    >
+                      <Trash2 size={17} />
+                      <span>删除本集记录</span>
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -2078,6 +2114,25 @@ export default function BangumiLensApp() {
           actions={[
             { label: "取消", onClick: () => setDeleteHistoryPrompt(null), className: "secondary-action" },
             { label: "删除", onClick: confirmDeleteHistoryItem, className: "primary-action" }
+          ]}
+        />
+      ) : null}
+      {likeHistoryPrompt ? (
+        <ConfirmDialog
+          titleId="like-history-title"
+          icon={<Heart size={20} fill={likeHistoryPrompt.liked ? "currentColor" : "none"} />}
+          label={likeHistoryPrompt.liked ? "喜欢本集" : "取消喜欢"}
+          title={likeHistoryPrompt.liked ? "确认喜欢本集" : "确认取消喜欢"}
+          description={
+            <>
+              将{likeHistoryPrompt.liked ? "标记" : "取消标记"}「
+              {getHistoryEpisodeLabelFromMeta(getSavedReportMeta(likeHistoryPrompt.item))}」为喜欢状态。
+            </>
+          }
+          onClose={() => setLikeHistoryPrompt(null)}
+          actions={[
+            { label: "取消", onClick: () => setLikeHistoryPrompt(null), className: "secondary-action" },
+            { label: likeHistoryPrompt.liked ? "确认喜欢" : "取消喜欢", onClick: confirmLikeHistoryItem, className: "primary-action" }
           ]}
         />
       ) : null}

@@ -940,6 +940,15 @@ input {
   color: var(--accent-dark);
 }
 
+.episode-nav .episode-delete-button {
+  color: var(--danger);
+}
+
+.episode-nav .episode-delete-button:hover {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  color: var(--danger);
+}
+
 .metrics {
   display: flex;
   flex-wrap: nowrap;
