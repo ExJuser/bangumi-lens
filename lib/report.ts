@@ -4,6 +4,7 @@ import { loadReportPrompt } from "@/lib/report-prompt";
 import { configureServerProxy, createHttpsProxyAgent } from "@/lib/proxy";
 import { buildReportStats } from "@/lib/report-stats";
 import type { AnalyzeReport, EpisodeMeta, ReportItem, WeightedComment } from "@/lib/types";
+import type { SeasonTrendPayload } from "@/lib/season-trends";
 import type { WebSearchResult } from "@/lib/web-search";
 import { buildCommentDigest } from "@/lib/weights";
 
@@ -222,6 +223,56 @@ export async function translateSubjectTitle(input: { title: string }) {
   }
 
   return translatedTitle;
+}
+
+export async function refineSeasonTrendSummary(trends: SeasonTrendPayload) {
+  configureServerProxy();
+
+  const apiKey = requireModelApiKey();
+  const client = createClient(apiKey);
+  const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content:
+          "你是动画评论趋势总结助手。基于输入的本地 Bangumi Lens 多集趋势，只输出一段自然中文总结，不编造未给出的数据，不超过 220 字。"
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          subjectName: trends.subjectName,
+          episodeTotal: trends.episodeTotal,
+          savedReportCount: trends.savedReportCount,
+          episodes: trends.episodes.map((episode) => ({
+            label: episode.label,
+            title: episode.title,
+            ratingAverage: episode.ratingAverage,
+            ratingVoteCount: episode.ratingVoteCount,
+            commentCount: episode.commentCount,
+            replyCount: episode.replyCount,
+            reactionCount: episode.reactionCount,
+            participantCount: episode.participantCount,
+            discussionHeat: episode.discussionHeat
+          })),
+          metrics: trends.metrics,
+          resonancePoints: trends.resonancePoints.slice(0, 5),
+          controversyPoints: trends.controversyPoints.slice(0, 5),
+          localSummary: trends.localSummary
+        })
+      }
+    ],
+    temperature: 0.2
+  });
+
+  const summary = response.choices[0]?.message.content?.trim();
+  if (!summary) {
+    throw new Error("模型 API 未返回可用的整季总结。");
+  }
+
+  return summary;
 }
 
 export function parseReportOutput(outputText: string, meta: EpisodeMeta, comments: WeightedComment[]): AnalyzeReport {

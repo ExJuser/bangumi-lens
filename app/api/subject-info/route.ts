@@ -11,6 +11,10 @@ type SubjectInfoPayload = Awaited<ReturnType<typeof fetchBangumiSubjectInfo>>;
 const SUBJECT_INFO_CACHE_NAMESPACE = "bangumi-subject-info";
 const SUBJECT_INFO_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+function hasEpisodeList(subjectInfo: SubjectInfoPayload | undefined) {
+  return Array.isArray(subjectInfo?.episodes) && subjectInfo.episodes.length > 0;
+}
+
 export async function GET(request: Request) {
   const startedAt = Date.now();
   const subjectId = new URL(request.url).searchParams.get("subjectId")?.trim();
@@ -26,7 +30,7 @@ export async function GET(request: Request) {
       subjectId,
       SUBJECT_INFO_CACHE_TTL_MS
     );
-    if (cached) {
+    if (cached && hasEpisodeList(cached)) {
       await appendAppLog("info", "subject-info.request.cache_hit", {
         subjectId,
         durationMs: Date.now() - startedAt

@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   ArrowRight,
+  BarChart3,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -13,6 +14,7 @@ import {
   Heart,
   Home,
   History,
+  LineChart,
   Loader2,
   MessageCircle,
   Moon,
@@ -103,6 +105,60 @@ type SavedReport = {
   meta: Report["meta"];
   stats: Report["stats"];
   report?: Report;
+};
+
+type SeasonTrendDirection = "rising" | "falling" | "stable" | "unknown";
+
+type SeasonTrendEpisode = {
+  id: string;
+  url: string;
+  label: string;
+  title: string;
+  sortValue: number;
+  episodeNumber?: number;
+  episodeSort?: number;
+  ratingAverage?: number;
+  ratingVoteCount?: number;
+  commentCount: number;
+  replyCount: number;
+  reactionCount: number;
+  participantCount: number;
+  discussionHeat: number;
+};
+
+type SeasonTrendPoint = {
+  title: string;
+  summary: string;
+  episodeId: string;
+  episodeLabel: string;
+  heat: number;
+};
+
+type SeasonTrendMetricSummary = {
+  first?: number;
+  latest?: number;
+  peak?: number;
+  peakEpisodeLabel?: string;
+  direction: SeasonTrendDirection;
+};
+
+type SeasonTrendPayload = {
+  subjectId?: string;
+  subjectName: string;
+  episodeTotal?: number;
+  savedReportCount: number;
+  requiredReportCount: number;
+  missingReportCount: number;
+  available: boolean;
+  episodes: SeasonTrendEpisode[];
+  metrics: {
+    rating: SeasonTrendMetricSummary;
+    comments: SeasonTrendMetricSummary;
+    heat: SeasonTrendMetricSummary;
+  };
+  resonancePoints: SeasonTrendPoint[];
+  controversyPoints: SeasonTrendPoint[];
+  localSummary: string;
 };
 
 function HoverScrollText({ className, text }: { className?: string; text: string }) {
@@ -199,6 +255,35 @@ type LikeHistoryPrompt = {
   liked: boolean;
 };
 
+type SeasonReportGenerationItemStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+type SeasonReportGenerationItem = {
+  id: string;
+  url: string;
+  label: string;
+  status: SeasonReportGenerationItemStatus;
+  error?: string;
+};
+
+type SeasonReportGenerationState = {
+  status: "running" | "completed" | "cancelled" | "failed";
+  totalCount: number;
+  completedCount: number;
+  failedCount: number;
+  currentIndex: number;
+  currentLabel?: string;
+  streamingText: string;
+  message?: string;
+  items: SeasonReportGenerationItem[];
+};
+
+type PendingSeasonReportGeneration = {
+  subjectName: string;
+  savedReportCount: number;
+  episodeTotal?: number;
+  candidates: SeasonReportGenerationItem[];
+};
+
 type SubjectInfo = {
   titleCn?: string;
   episodeTotal?: number;
@@ -284,6 +369,11 @@ function getSearchResultSubtitle(result: SearchResult) {
 
 function buildSearchEpisodeUrl(episodeId: string) {
   return `https://bgm.tv/ep/${episodeId}`;
+}
+
+function getEpisodeSortLabel(sort?: number, fallbackId?: string) {
+  if (typeof sort === "number") return `第 ${formatEpisodeNumber(sort)} 话`;
+  return fallbackId ? `ep.${fallbackId}` : "未知话数";
 }
 
 function getEpisodeChoiceLabel(episode: EpisodeAvailabilitySignals) {
@@ -532,6 +622,311 @@ function ReportSection({
       </div>
       <ReportList items={items || []} icon={icon} episodeUrl={episodeUrl} />
     </article>
+  );
+}
+
+function formatTrendNumber(value?: number, digits = 0) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "暂无";
+  return value.toLocaleString("zh-CN", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits
+  });
+}
+
+function getTrendDirectionLabel(direction: SeasonTrendDirection) {
+  if (direction === "rising") return "上升";
+  if (direction === "falling") return "回落";
+  if (direction === "stable") return "平稳";
+  return "不足";
+}
+
+function SeasonTrendMetricCard({
+  label,
+  metric,
+  digits = 0
+}: {
+  label: string;
+  metric: SeasonTrendMetricSummary;
+  digits?: number;
+}) {
+  return (
+    <div className="season-trend-metric">
+      <span>{label}</span>
+      <strong>{formatTrendNumber(metric.latest, digits)}</strong>
+      <p>
+        峰值 {formatTrendNumber(metric.peak, digits)}
+        {metric.peakEpisodeLabel ? ` / ${metric.peakEpisodeLabel}` : ""} · {getTrendDirectionLabel(metric.direction)}
+      </p>
+    </div>
+  );
+}
+
+function SeasonTrendBars({
+  episodes,
+  valueKey,
+  label,
+  digits = 0
+}: {
+  episodes: SeasonTrendEpisode[];
+  valueKey: keyof Pick<SeasonTrendEpisode, "ratingAverage" | "commentCount" | "discussionHeat">;
+  label: string;
+  digits?: number;
+}) {
+  const values = episodes.map((episode) => Number(episode[valueKey]) || 0);
+  const maxValue = Math.max(...values, 1);
+
+  return (
+    <div className="season-trend-chart" aria-label={label}>
+      {episodes.map((episode) => {
+        const value = Number(episode[valueKey]) || 0;
+        const height = `${Math.max(6, (value / maxValue) * 100)}%`;
+        return (
+          <div className="season-trend-bar" key={`${label}-${episode.id}`} title={`${episode.label} ${formatTrendNumber(value, digits)}`}>
+            <i style={{ height }} />
+            <span>{episode.episodeSort ?? episode.episodeNumber ?? episode.id}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SeasonTrendPointList({ title, points }: { title: string; points: SeasonTrendPoint[] }) {
+  return (
+    <article className="panel season-trend-points">
+      <div className="panel-title">
+        <MessageCircle size={18} />
+        <h2>{title}</h2>
+      </div>
+      {points.length > 0 ? (
+        <div className="season-trend-point-list">
+          {points.slice(0, 5).map((point) => (
+            <section className="season-trend-point" key={`${point.episodeId}-${point.title}`}>
+              <span>{point.episodeLabel}</span>
+              <h3>{point.title}</h3>
+              <p>
+                <RichText text={point.summary} />
+              </p>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">当前本地报告里还没有足够明确的聚合信号。</p>
+      )}
+    </article>
+  );
+}
+
+function SeasonReportGenerationProgress({
+  generation,
+  onCancel
+}: {
+  generation: SeasonReportGenerationState;
+  onCancel: () => void;
+}) {
+  const running = generation.status === "running";
+  const settledCount = generation.completedCount + generation.failedCount;
+  const progressCount = running ? Math.min(generation.totalCount, settledCount + 0.45) : settledCount;
+  const percent = generation.totalCount > 0 ? Math.round((progressCount / generation.totalCount) * 100) : 0;
+
+  return (
+    <article className="season-report-generation">
+      <div className="season-report-generation-head">
+        <div>
+          <strong>全集总结报告生成进度</strong>
+          <p>
+            已完成 {generation.completedCount} / {generation.totalCount}
+            {generation.failedCount > 0 ? `，失败 ${generation.failedCount}` : ""}
+            {generation.currentLabel ? `，当前 ${generation.currentLabel}` : ""}
+          </p>
+        </div>
+        {running ? (
+          <button className="season-report-cancel" type="button" onClick={onCancel}>
+            取消生成
+          </button>
+        ) : null}
+      </div>
+      <div className={running ? "season-report-progress-track running" : "season-report-progress-track"} aria-label="全集总结报告生成进度">
+        <i style={{ width: `${percent}%` }} />
+      </div>
+      {generation.message ? <p className="season-report-generation-message">{generation.message}</p> : null}
+      <div className="season-report-generation-list">
+        {generation.items.map((item) => (
+          <div className={`season-report-generation-item ${item.status}`} key={item.id}>
+            <span>{item.label}</span>
+            <strong>
+              {item.status === "running"
+                ? "生成中"
+                : item.status === "completed"
+                  ? "已完成"
+                  : item.status === "failed"
+                    ? "失败"
+                    : item.status === "cancelled"
+                      ? "已取消"
+                      : "等待中"}
+            </strong>
+            {item.error ? <em>{item.error}</em> : null}
+          </div>
+        ))}
+      </div>
+      {generation.streamingText ? <pre className="season-report-stream-preview">{generation.streamingText}</pre> : null}
+    </article>
+  );
+}
+
+function SeasonTrendPanel({
+  trends,
+  loading,
+  error,
+  aiSummary,
+  aiSummaryLoading,
+  aiSummaryError,
+  generation,
+  onRequestAiSummary,
+  onPrepareSeasonGeneration,
+  onCancelSeasonGeneration
+}: {
+  trends: SeasonTrendPayload | null;
+  loading: boolean;
+  error: string;
+  aiSummary: string;
+  aiSummaryLoading: boolean;
+  aiSummaryError: string;
+  generation: SeasonReportGenerationState | null;
+  onRequestAiSummary: () => void;
+  onPrepareSeasonGeneration: () => void;
+  onCancelSeasonGeneration: () => void;
+}) {
+  if (loading) {
+    return (
+      <section className="season-trend-panel">
+        <div className="season-trend-loading">
+          <Loader2 className="spin" size={18} />
+          <span>正在读取本地作品报告...</span>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="season-trend-panel">
+        <article className="season-trend-empty">
+          <AlertCircle size={20} />
+          <div>
+            <strong>作品趋势读取失败</strong>
+            <p>{error}</p>
+          </div>
+        </article>
+      </section>
+    );
+  }
+
+  if (!trends) return null;
+
+  if (!trends.available) {
+    return (
+      <section className="season-trend-panel">
+        <article className="season-trend-empty">
+          <BarChart3 size={20} />
+          <div>
+            <strong>作品趋势还需要更多本地报告</strong>
+            <p>
+              已保存 {trends.savedReportCount} 集，至少需要 {trends.requiredReportCount} 集；还差{" "}
+              {trends.missingReportCount} 集后再生成整季趋势。
+            </p>
+            <button
+              className="season-report-generate-button"
+              type="button"
+              onClick={onPrepareSeasonGeneration}
+              disabled={generation?.status === "running"}
+            >
+              {generation?.status === "running" ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
+              <span>{generation?.status === "running" ? "正在生成全集总结报告" : "生成全集总结报告"}</span>
+            </button>
+          </div>
+        </article>
+        {generation ? <SeasonReportGenerationProgress generation={generation} onCancel={onCancelSeasonGeneration} /> : null}
+      </section>
+    );
+  }
+
+  return (
+    <section className="season-trend-panel">
+      <div className="season-trend-head">
+        <div>
+          <span className="label">Season Trends</span>
+          <h2>{trends.subjectName} 观众观感趋势</h2>
+          <p>
+            已覆盖 {trends.savedReportCount}
+            {trends.episodeTotal ? ` / ${trends.episodeTotal}` : ""} 集本地报告。
+          </p>
+        </div>
+      </div>
+
+      <div className="season-trend-summary">
+        <div>
+          <h3>本作到目前为止的观众观感总结</h3>
+          <p>
+            <RichText text={aiSummary || trends.localSummary} />
+          </p>
+          {aiSummaryError ? <p className="season-trend-error">{aiSummaryError}</p> : null}
+        </div>
+        <button
+          className="season-trend-ai-summary"
+          type="button"
+          onClick={onRequestAiSummary}
+          disabled={aiSummaryLoading}
+          title="调用模型精炼整季总结"
+        >
+          {aiSummaryLoading ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
+          <span>{aiSummaryLoading ? "总结中" : aiSummary ? "重新精炼" : "AI 精炼"}</span>
+        </button>
+      </div>
+
+      <div className="season-trend-metrics">
+        <SeasonTrendMetricCard label="最新评分" metric={trends.metrics.rating} digits={1} />
+        <SeasonTrendMetricCard label="最新评论" metric={trends.metrics.comments} />
+        <SeasonTrendMetricCard label="讨论热度" metric={trends.metrics.heat} />
+      </div>
+
+      <div className="season-trend-grid">
+        <article className="panel season-trend-chart-card">
+          <div className="panel-title">
+            <LineChart size={18} />
+            <h2>评分变化</h2>
+          </div>
+          <SeasonTrendBars episodes={trends.episodes} valueKey="ratingAverage" label="评分变化" digits={1} />
+        </article>
+        <article className="panel season-trend-chart-card">
+          <div className="panel-title">
+            <BarChart3 size={18} />
+            <h2>讨论热度变化</h2>
+          </div>
+          <SeasonTrendBars episodes={trends.episodes} valueKey="discussionHeat" label="讨论热度变化" />
+        </article>
+      </div>
+
+      <div className="season-trend-episode-list" aria-label="多集对比">
+        {trends.episodes.map((episode) => (
+          <article className="season-trend-episode" key={episode.id}>
+            <div>
+              <span>{episode.label}</span>
+              <strong>{episode.title}</strong>
+            </div>
+            <p>
+              评分 {formatTrendNumber(episode.ratingAverage, 1)} · 评论 {formatTrendNumber(episode.commentCount)} · 热度{" "}
+              {formatTrendNumber(episode.discussionHeat)}
+            </p>
+          </article>
+        ))}
+      </div>
+
+      <div className="season-trend-grid">
+        <SeasonTrendPointList title="共鸣点变化" points={trends.resonancePoints} />
+        <SeasonTrendPointList title="争议点变化" points={trends.controversyPoints} />
+      </div>
+    </section>
   );
 }
 
@@ -863,6 +1258,17 @@ function getAdjacentEpisodeInfo(
   return subjectInfo?.episodes?.find((episode) => episode.sort === expectedSort);
 }
 
+function getReportFallbackEpisodes(report: Report) {
+  const episodes = [report.meta.previousEpisode, report.meta.currentEpisode, report.meta.nextEpisode].filter(
+    (episode): episode is EpisodeAvailabilitySignals => Boolean(episode?.id)
+  );
+  const uniqueEpisodes = new Map<string, EpisodeAvailabilitySignals>();
+  episodes.forEach((episode) => uniqueEpisodes.set(episode.id, episode));
+  return [...uniqueEpisodes.values()].sort(
+    (a, b) => (a.sort ?? Number.MAX_SAFE_INTEGER) - (b.sort ?? Number.MAX_SAFE_INTEGER) || Number(a.id) - Number(b.id)
+  );
+}
+
 function formatEpisodeAirdate(airdate?: string) {
   if (!airdate) return "";
   const match = airdate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -928,6 +1334,72 @@ function isEpisodeUnavailable(report: Report, direction: EpisodeDirection, known
   return typeof episodeTotal === "number" && episodeTotal > 0 && typeof episodeSort === "number" && episodeSort < episodeTotal;
 }
 
+async function analyzeEpisodeReport(
+  trimmedUrl: string,
+  options: {
+    signal?: AbortSignal;
+    onDelta?: (text: string) => void;
+    onFinal?: (report: Report) => void;
+  } = {}
+) {
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: trimmedUrl }),
+    signal: options.signal
+  });
+
+  if (!response.ok) {
+    const payload = await response.json();
+    throw new Error(payload.error || "生成失败，请稍后重试。");
+  }
+
+  if (!response.body) {
+    throw new Error("浏览器没有收到流式响应。");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalReport: Report | null = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+
+    for (const eventBlock of events) {
+      const eventName = eventBlock.match(/^event: (.+)$/m)?.[1];
+      const dataLine = eventBlock.match(/^data: (.+)$/m)?.[1];
+      if (!eventName || !dataLine) continue;
+
+      const payload = JSON.parse(dataLine);
+
+      if (eventName === "delta") {
+        options.onDelta?.(payload.text);
+      }
+
+      if (eventName === "final") {
+        finalReport = payload;
+        options.onFinal?.(payload);
+      }
+
+      if (eventName === "error") {
+        throw new Error(payload.error || "流式生成失败，请稍后重试。");
+      }
+    }
+  }
+
+  if (!finalReport) {
+    throw new Error("生成结束但没有收到完整报告。");
+  }
+
+  return finalReport;
+}
+
 export default function BangumiLensApp() {
   const router = useRouter();
   const pathname = usePathname();
@@ -958,7 +1430,19 @@ export default function BangumiLensApp() {
   const [loadingSearchEpisodes, setLoadingSearchEpisodes] = useState(false);
   const [reportSwitching, setReportSwitching] = useState(false);
   const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(() => new Set());
+  const [showSeasonTrend, setShowSeasonTrend] = useState(false);
+  const [seasonTrend, setSeasonTrend] = useState<SeasonTrendPayload | null>(null);
+  const [seasonTrendLoading, setSeasonTrendLoading] = useState(false);
+  const [seasonTrendError, setSeasonTrendError] = useState("");
+  const [seasonTrendAiSummary, setSeasonTrendAiSummary] = useState("");
+  const [seasonTrendAiSummaryLoading, setSeasonTrendAiSummaryLoading] = useState(false);
+  const [seasonTrendAiSummaryError, setSeasonTrendAiSummaryError] = useState("");
+  const [seasonReportGeneration, setSeasonReportGeneration] = useState<SeasonReportGenerationState | null>(null);
+  const [pendingSeasonReportGeneration, setPendingSeasonReportGeneration] =
+    useState<PendingSeasonReportGeneration | null>(null);
   const autoAnalyzeUrlRef = useRef<string | null>(null);
+  const seasonReportGenerationAbortRef = useRef<AbortController | null>(null);
+  const seasonReportGenerationCancelledRef = useRef(false);
   const loadedRouteReportIdRef = useRef<string | null>(null);
   const pendingRouteReportIdRef = useRef<string | null>(null);
   const returningHomeRef = useRef(false);
@@ -970,6 +1454,7 @@ export default function BangumiLensApp() {
       pendingDuplicate ||
       pendingAutoAnalyzeUrl ||
       pendingReportRegeneration ||
+      pendingSeasonReportGeneration ||
       pendingAiTitleTranslation ||
       pendingAiSubjectTitleTranslation ||
       missingEpisodePrompt ||
@@ -1004,6 +1489,7 @@ export default function BangumiLensApp() {
       if (reportSwitchingTimeoutRef.current !== null) {
         window.clearTimeout(reportSwitchingTimeoutRef.current);
       }
+      seasonReportGenerationAbortRef.current?.abort();
     };
   }, []);
 
@@ -1045,6 +1531,11 @@ export default function BangumiLensApp() {
       setUrl(nextUrl || nextReport.meta.url);
       setError("");
       setStreamingText("");
+      setShowSeasonTrend(false);
+      setSeasonTrend(null);
+      setSeasonTrendError("");
+      setSeasonTrendAiSummary("");
+      setSeasonTrendAiSummaryError("");
       setMissingEpisodePrompt(null);
       setPendingDuplicate(null);
       setHistory((currentHistory) =>
@@ -1249,6 +1740,15 @@ export default function BangumiLensApp() {
     setLoading(false);
     setStreamingText("");
     setSearchResults([]);
+    setShowSeasonTrend(false);
+    setSeasonTrend(null);
+    setSeasonTrendError("");
+    setSeasonTrendAiSummary("");
+    setSeasonTrendAiSummaryError("");
+    setSeasonReportGeneration(null);
+    setPendingSeasonReportGeneration(null);
+    seasonReportGenerationCancelledRef.current = true;
+    seasonReportGenerationAbortRef.current?.abort();
     setMissingEpisodePrompt(null);
     setPendingDuplicate(null);
     setPendingAutoAnalyzeUrl("");
@@ -1258,7 +1758,7 @@ export default function BangumiLensApp() {
     router.push(HOME_ROUTE);
   }
 
-  const saveReport = useCallback((nextReport: Report, sourceUrl: string) => {
+  const saveReport = useCallback((nextReport: Report, sourceUrl: string, options: { navigate?: boolean } = {}) => {
     const existingLikedAt = history.find((item) => getSavedReportMeta(item).url === nextReport.meta.url)?.likedAt;
     const nextItem: SavedReport = {
       id: `${nextReport.meta.episodeId}-${Date.now()}`,
@@ -1275,7 +1775,7 @@ export default function BangumiLensApp() {
       return [nextItem, ...dedupedHistory];
     });
 
-    void fetch("/api/history", {
+    return fetch("/api/history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ report: nextReport, url: sourceUrl })
@@ -1286,7 +1786,7 @@ export default function BangumiLensApp() {
         if (payload.history) {
           setHistory(payload.history);
           const savedItem = findExistingReport(payload.history, nextReport.meta.url);
-          if (savedItem) {
+          if (savedItem && options.navigate !== false) {
             loadedRouteReportIdRef.current = savedItem.id;
             pendingRouteReportIdRef.current = savedItem.id;
             router.replace(getReportRoute(savedItem.id));
@@ -1364,6 +1864,253 @@ export default function BangumiLensApp() {
     const { item, liked } = likeHistoryPrompt;
     setLikeHistoryPrompt(null);
     toggleReportLike(item, liked);
+  }
+
+  async function loadSeasonTrend() {
+    const currentReport = report;
+    const subjectName = currentReport ? getSubjectName(currentReport) : "";
+    if (!currentReport?.meta.subjectId && !subjectName) {
+      setShowSeasonTrend(true);
+      setSeasonTrend(null);
+      setSeasonTrendError("当前报告缺少作品信息，暂时无法读取作品趋势。");
+      return;
+    }
+
+    setShowSeasonTrend(true);
+    setSeasonTrendLoading(true);
+    setSeasonTrendError("");
+    setSeasonTrendAiSummary("");
+    setSeasonTrendAiSummaryError("");
+
+    try {
+      const params = new URLSearchParams();
+      if (currentReport?.meta.subjectId) params.set("subjectId", currentReport.meta.subjectId);
+      if (subjectName) params.set("subjectName", subjectName);
+      const response = await fetch(`/api/season-trends?${params.toString()}`, { cache: "no-store" });
+      const payload = (await response.json()) as { trends?: SeasonTrendPayload; error?: string };
+      if (!response.ok || !payload.trends) {
+        throw new Error(payload.error || "作品趋势读取失败。");
+      }
+      setSeasonTrend(payload.trends);
+    } catch (error) {
+      setSeasonTrend(null);
+      setSeasonTrendError(error instanceof Error ? error.message : "作品趋势读取失败。");
+    } finally {
+      setSeasonTrendLoading(false);
+    }
+  }
+
+  async function requestSeasonTrendAiSummary() {
+    if (!seasonTrend?.available || seasonTrendAiSummaryLoading) return;
+
+    setSeasonTrendAiSummaryLoading(true);
+    setSeasonTrendAiSummaryError("");
+
+    try {
+      const response = await fetch("/api/season-trends/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trends: seasonTrend })
+      });
+      const payload = (await response.json()) as { summary?: string; error?: string };
+      if (!response.ok || !payload.summary) {
+        throw new Error(payload.error || "AI 总结生成失败。");
+      }
+      setSeasonTrendAiSummary(payload.summary);
+    } catch (error) {
+      setSeasonTrendAiSummaryError(error instanceof Error ? error.message : "AI 总结生成失败。");
+    } finally {
+      setSeasonTrendAiSummaryLoading(false);
+    }
+  }
+
+  async function prepareSeasonReportGeneration() {
+    const currentReport = report;
+    if (!currentReport || seasonReportGeneration?.status === "running") return;
+
+    setSeasonTrendError("");
+
+    try {
+      let subjectInfo = currentReport.meta.subjectId ? subjectInfoById[currentReport.meta.subjectId] : undefined;
+      if (currentReport.meta.subjectId && !subjectInfo?.episodes) {
+        const response = await fetch(`/api/subject-info?subjectId=${encodeURIComponent(currentReport.meta.subjectId)}`, {
+          cache: "no-store"
+        });
+        const payload = (await response.json()) as SubjectInfo & { error?: string };
+        if (!response.ok) {
+          throw new Error(payload.error || "章节列表加载失败，请稍后重试。");
+        }
+        subjectInfo = payload;
+        setSubjectInfoById((current) => ({ ...current, [currentReport.meta.subjectId as string]: payload }));
+      }
+
+      const subjectName = getSubjectName(currentReport);
+      const savedEpisodeIds = new Set(
+        history
+          .filter((item) => {
+            const meta = getSavedReportMeta(item);
+            return meta.subjectId
+              ? meta.subjectId === currentReport.meta.subjectId
+              : getSubjectNameFromMeta(meta) === subjectName;
+          })
+          .map((item) => getSavedReportMeta(item).episodeId)
+      );
+      const sourceEpisodes =
+        subjectInfo?.episodes && subjectInfo.episodes.length > 0
+          ? subjectInfo.episodes
+          : getReportFallbackEpisodes(currentReport);
+      const missingEpisodes = sourceEpisodes.filter((episode) => episode.id && !savedEpisodeIds.has(episode.id));
+      const savedCount = seasonTrend?.savedReportCount ?? currentSubjectHistory.length;
+      const candidates = missingEpisodes.map((episode) => ({
+        id: episode.id,
+        url: buildSearchEpisodeUrl(episode.id),
+        label: getEpisodeChoiceLabel(episode),
+        status: "pending" as const
+      }));
+
+      if (candidates.length === 0) {
+        throw new Error("没有找到可补齐的未保存章节。");
+      }
+
+      setPendingSeasonReportGeneration({
+        subjectName,
+        savedReportCount: savedCount,
+        episodeTotal: subjectInfo?.episodeTotal ?? currentReport.meta.episodeTotal,
+        candidates
+      });
+    } catch (caught) {
+      setSeasonTrendError(caught instanceof Error ? caught.message : "章节列表加载失败，请稍后重试。");
+    }
+  }
+
+  async function confirmSeasonReportGeneration() {
+    if (!pendingSeasonReportGeneration) return;
+    const generationPlan = pendingSeasonReportGeneration;
+    setPendingSeasonReportGeneration(null);
+    seasonReportGenerationCancelledRef.current = false;
+    seasonReportGenerationAbortRef.current?.abort();
+
+    const initialItems = generationPlan.candidates.map((item) => ({ ...item, status: "pending" as const }));
+    setSeasonReportGeneration({
+      status: "running",
+      totalCount: initialItems.length,
+      completedCount: 0,
+      failedCount: 0,
+      currentIndex: 0,
+      currentLabel: initialItems[0]?.label,
+      streamingText: "",
+      message: "正在串行生成缺失章节报告。",
+      items: initialItems
+    });
+
+    let completedCount = 0;
+    let failedCount = 0;
+
+    for (let index = 0; index < initialItems.length; index += 1) {
+      const item = initialItems[index];
+      if (seasonReportGenerationCancelledRef.current) break;
+
+      const abortController = new AbortController();
+      seasonReportGenerationAbortRef.current = abortController;
+      setSeasonReportGeneration((current) =>
+        current
+          ? {
+              ...current,
+              status: "running",
+              currentIndex: index,
+              currentLabel: item.label,
+              streamingText: "",
+              items: current.items.map((entry) =>
+                entry.id === item.id ? { ...entry, status: "running", error: undefined } : entry
+              )
+            }
+          : current
+      );
+
+      try {
+        const nextReport = await analyzeEpisodeReport(item.url, {
+          signal: abortController.signal,
+          onDelta: (text) => {
+            setSeasonReportGeneration((current) =>
+              current ? { ...current, streamingText: `${current.streamingText}${text}` } : current
+            );
+          }
+        });
+
+        await saveReport(nextReport, item.url, { navigate: false });
+        completedCount += 1;
+        setSeasonReportGeneration((current) =>
+          current
+            ? {
+                ...current,
+                completedCount,
+                items: current.items.map((entry) =>
+                  entry.id === item.id ? { ...entry, status: "completed" } : entry
+                )
+              }
+            : current
+        );
+      } catch (caught) {
+        if (abortController.signal.aborted || seasonReportGenerationCancelledRef.current) {
+          break;
+        }
+
+        failedCount += 1;
+        const message = caught instanceof Error ? caught.message : "生成失败，请稍后重试。";
+        setSeasonReportGeneration((current) =>
+          current
+            ? {
+                ...current,
+                failedCount,
+                items: current.items.map((entry) =>
+                  entry.id === item.id ? { ...entry, status: "failed", error: message } : entry
+                )
+              }
+            : current
+        );
+      } finally {
+        if (seasonReportGenerationAbortRef.current === abortController) {
+          seasonReportGenerationAbortRef.current = null;
+        }
+      }
+    }
+
+    const cancelled = seasonReportGenerationCancelledRef.current;
+    setSeasonReportGeneration((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        status: cancelled ? "cancelled" : failedCount > 0 ? "failed" : "completed",
+        completedCount,
+        failedCount,
+        currentLabel: undefined,
+        streamingText: "",
+        message: cancelled
+          ? "已取消生成，已完成的报告已保留。"
+          : failedCount > 0
+            ? "部分章节生成失败，已完成的报告已保留。"
+            : "缺失章节报告已生成完成。"
+      };
+    });
+    seasonReportGenerationCancelledRef.current = false;
+    void loadSeasonTrend();
+  }
+
+  function cancelSeasonReportGeneration() {
+    seasonReportGenerationCancelledRef.current = true;
+    seasonReportGenerationAbortRef.current?.abort();
+    setSeasonReportGeneration((current) =>
+      current
+        ? {
+            ...current,
+            status: "cancelled",
+            currentLabel: undefined,
+            streamingText: "",
+            message: "正在取消，已完成的报告会保留。",
+            items: current.items.map((item) => (item.status === "pending" ? { ...item, status: "cancelled" } : item))
+          }
+        : current
+    );
   }
 
   const groupedHistory = useMemo(() => {
@@ -2191,6 +2938,16 @@ export default function BangumiLensApp() {
                   <span>下一集</span>
                   <ChevronRight size={17} />
                 </button>
+                <button
+                  className={showSeasonTrend ? "season-trend-toggle active" : "season-trend-toggle"}
+                  type="button"
+                  onClick={() => (showSeasonTrend ? setShowSeasonTrend(false) : void loadSeasonTrend())}
+                  aria-pressed={showSeasonTrend}
+                  title="查看作品趋势"
+                >
+                  <BarChart3 size={17} />
+                  <span>作品趋势</span>
+                </button>
                 {currentSavedReport ? (
                   <>
                     <button
@@ -2225,6 +2982,21 @@ export default function BangumiLensApp() {
           </div>
             );
           })()}
+
+          {showSeasonTrend ? (
+            <SeasonTrendPanel
+              trends={seasonTrend}
+              loading={seasonTrendLoading}
+              error={seasonTrendError}
+              aiSummary={seasonTrendAiSummary}
+              aiSummaryLoading={seasonTrendAiSummaryLoading}
+              aiSummaryError={seasonTrendAiSummaryError}
+              generation={seasonReportGeneration}
+              onRequestAiSummary={requestSeasonTrendAiSummary}
+              onPrepareSeasonGeneration={prepareSeasonReportGeneration}
+              onCancelSeasonGeneration={cancelSeasonReportGeneration}
+            />
+          ) : null}
 
           <div className="report-grid">
             <article className="panel primary">
@@ -2434,6 +3206,25 @@ export default function BangumiLensApp() {
           actions={[
             { label: "取消", onClick: () => setPendingReportRegeneration(null), className: "secondary-action" },
             { label: "确认重新生成", onClick: confirmReportRegeneration, className: "primary-action" }
+          ]}
+        />
+      ) : null}
+      {pendingSeasonReportGeneration ? (
+        <ConfirmDialog
+          titleId="season-report-generation-title"
+          icon={<Sparkles size={20} />}
+          label="全集总结报告"
+          title="确认生成缺失章节报告？"
+          description={
+            <>
+              将为《{pendingSeasonReportGeneration.subjectName}》串行生成 {pendingSeasonReportGeneration.candidates.length} 集缺失报告，
+              生成完成一集就保存一集。中途取消只会停止后续生成，已经完成的报告会保留。
+            </>
+          }
+          onClose={() => setPendingSeasonReportGeneration(null)}
+          actions={[
+            { label: "取消", onClick: () => setPendingSeasonReportGeneration(null), className: "secondary-action" },
+            { label: "确认生成", onClick: confirmSeasonReportGeneration, className: "primary-action" }
           ]}
         />
       ) : null}

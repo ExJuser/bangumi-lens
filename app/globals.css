@@ -1174,6 +1174,12 @@ input {
   color: var(--danger);
 }
 
+.episode-nav .season-trend-toggle.active {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-soft));
+  color: var(--accent-dark);
+}
+
 .metrics {
   display: flex;
   flex-wrap: nowrap;
@@ -1387,6 +1393,430 @@ input {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.season-trend-panel {
+  display: grid;
+  gap: 16px;
+  margin: 0 0 20px;
+}
+
+.season-trend-loading,
+.season-trend-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 16px;
+}
+
+.season-trend-loading {
+  align-items: center;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.season-trend-empty svg {
+  flex: 0 0 auto;
+  color: var(--accent-dark);
+}
+
+.season-trend-empty strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.season-trend-empty > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.season-trend-empty > div > strong {
+  flex: 0 0 100%;
+}
+
+.season-trend-empty p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.season-report-generate-button,
+.season-report-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  padding: 7px 12px;
+  font-weight: 850;
+}
+
+.season-report-generate-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.season-report-generation {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 16px;
+}
+
+.season-report-generation-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.season-report-generation-head strong {
+  display: block;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.season-report-generation-head p,
+.season-report-generation-message {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.season-report-cancel {
+  flex: 0 0 auto;
+  margin-top: 0;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+.season-report-progress-track {
+  position: relative;
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+}
+
+.season-report-progress-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+  transition: width 180ms ease;
+}
+
+.season-report-progress-track.running i::after {
+  content: "";
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  animation: season-report-progress-shine 1200ms linear infinite;
+}
+
+@keyframes season-report-progress-shine {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.season-report-generation-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.season-report-generation-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px;
+}
+
+.season-report-generation-item span {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-report-generation-item strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.season-report-generation-item.completed strong {
+  color: var(--accent-dark);
+}
+
+.season-report-generation-item.failed strong {
+  color: var(--danger);
+}
+
+.season-report-generation-item em {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--danger);
+  font-size: 12px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-report-stream-preview {
+  max-height: 140px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 10px;
+  white-space: pre-wrap;
+}
+
+.season-trend-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.season-trend-head h2 {
+  margin: 4px 0 6px;
+  color: var(--ink);
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.season-trend-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.season-trend-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 18px;
+}
+
+.season-trend-summary h3 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.season-trend-summary p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.season-trend-ai-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  padding: 7px 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.season-trend-ai-summary:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.season-trend-error {
+  margin-top: 8px !important;
+  color: var(--danger) !important;
+}
+
+.season-trend-metrics,
+.season-trend-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.season-trend-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.season-trend-metric {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 14px;
+}
+
+.season-trend-metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.season-trend-metric strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--accent-dark);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.season-trend-metric p {
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-trend-chart-card {
+  min-height: 250px;
+}
+
+.season-trend-chart {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(24px, 1fr);
+  gap: 8px;
+  align-items: flex-end;
+  height: 170px;
+  overflow-x: auto;
+  padding-top: 10px;
+}
+
+.season-trend-bar {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 18px;
+  gap: 6px;
+  align-items: flex-end;
+  min-width: 24px;
+  height: 100%;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.season-trend-bar i {
+  display: block;
+  width: 100%;
+  min-height: 6px;
+  border-radius: 999px 999px 4px 4px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+}
+
+.season-trend-bar span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-trend-episode-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.season-trend-episode {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 12px;
+}
+
+.season-trend-episode span,
+.season-trend-point span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.season-trend-episode strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-trend-episode p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.season-trend-point-list {
+  display: grid;
+  gap: 12px;
+}
+
+.season-trend-point {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.season-trend-point:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.season-trend-point h3 {
+  margin: 4px 0 6px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.season-trend-point p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
 .extension-section {
@@ -1862,10 +2292,22 @@ input {
   .hero,
   .extension-grid,
   .report-grid,
+  .season-trend-grid,
   .report-header,
   .empty-dashboard-head,
   .recent-shortcuts {
     grid-template-columns: 1fr;
+  }
+
+  .season-trend-metrics,
+  .season-trend-episode-list,
+  .season-report-generation-list,
+  .season-trend-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .season-trend-ai-summary {
+    justify-self: flex-start;
   }
 
   .preview-grid,
@@ -1968,6 +2410,14 @@ input {
 
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .season-trend-episode {
+    grid-template-columns: 1fr;
+  }
+
+  .season-trend-episode p {
+    white-space: normal;
   }
 
   .metric,
