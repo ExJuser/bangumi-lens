@@ -373,11 +373,16 @@ input {
 }
 
 .hero-report .hero-copy h1 {
+  display: -webkit-box;
   max-width: 980px;
   margin: 8px 0 8px;
+  overflow: hidden;
   font-size: clamp(38px, 4.4vw, 62px);
   font-weight: 820;
   line-height: 1.03;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
 }
 
 .hero-subject-title {
@@ -1566,6 +1571,7 @@ input {
 
   .hero-report .hero-copy h1 {
     font-size: 38px;
+    -webkit-line-clamp: 3;
   }
 
   .input-row {

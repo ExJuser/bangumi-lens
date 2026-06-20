@@ -1313,7 +1313,7 @@ export default function BangumiLensApp() {
                 Bangumi Lens / Episode Report
               </div>
               {report.meta.subjectTitle ? <p className="hero-subject-title">{report.meta.subjectTitle}</p> : null}
-              <h1>{getHeroEpisodeTitle(report.meta)}</h1>
+              <h1 title={getHeroEpisodeTitle(report.meta)}>{getHeroEpisodeTitle(report.meta)}</h1>
             </>
           ) : (
             <>
