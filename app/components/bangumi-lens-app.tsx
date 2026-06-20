@@ -215,6 +215,10 @@ type SearchResult = {
   url: string;
 };
 
+type SearchEpisodeChoice = EpisodeAvailabilitySignals & {
+  url: string;
+};
+
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
 
 const BANGUMI_EPISODE_PATH = /^\/ep\/(\d+)\/?$/;
@@ -272,10 +276,19 @@ function getSearchResultTitle(result: SearchResult) {
   return result.titleCn || result.title;
 }
 
-function getSearchResultEpisodeLabel(result: SearchResult) {
-  const episodeNumber =
-    typeof result.firstEpisodeNumber === "number" ? `第 ${formatEpisodeNumber(result.firstEpisodeNumber)} 话` : "第 1 话";
-  return result.firstEpisodeTitle ? `${episodeNumber} ${result.firstEpisodeTitle}` : episodeNumber;
+function getSearchResultSubtitle(result: SearchResult) {
+  const titles = [result.title, result.titleCn].filter(Boolean);
+  return titles.length > 1 ? titles.join(" / ") : "选择作品后再选择具体话数";
+}
+
+function buildSearchEpisodeUrl(episodeId: string) {
+  return `https://bgm.tv/ep/${episodeId}`;
+}
+
+function getEpisodeChoiceLabel(episode: EpisodeAvailabilitySignals) {
+  const episodeNumber = typeof episode.sort === "number" ? `第 ${formatEpisodeNumber(episode.sort)} 话` : `ep.${episode.id}`;
+  const title = episode.titleCn || episode.title;
+  return title ? `${episodeNumber} ${title}` : episodeNumber;
 }
 
 const EMPTY_PREVIEW_ITEMS = [
@@ -935,6 +948,9 @@ export default function BangumiLensApp() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+  const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
+  const [loadingSearchEpisodes, setLoadingSearchEpisodes] = useState(false);
   const [reportSwitching, setReportSwitching] = useState(false);
   const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(() => new Set());
   const autoAnalyzeUrlRef = useRef<string | null>(null);
@@ -1610,14 +1626,10 @@ export default function BangumiLensApp() {
   }, [history, runAnalysis]);
 
   async function searchByTitle(query: string) {
-    const existingReport = findHistoryByTitle(history, query);
-    if (existingReport) {
-      await openSavedReport(existingReport);
-      return;
-    }
-
     setError("");
     setSearchResults([]);
+    setSelectedSearchResult(null);
+    setSearchEpisodes([]);
     setSearching(true);
 
     try {
@@ -1630,16 +1642,6 @@ export default function BangumiLensApp() {
       const results = payload.results || [];
       if (results.length === 0) {
         throw new Error("没有找到匹配的 Bangumi 条目，请试试更完整的作品名。");
-      }
-
-      const exactResult = results.find((result) =>
-        [result.titleCn, result.title].some((title) => title && normalizeSearchText(title) === normalizeSearchText(query))
-      );
-      const directResult = exactResult || (results.length === 1 ? results[0] : undefined);
-      if (directResult) {
-        setUrl(directResult.url);
-        startAnalysis(directResult.url);
-        return;
       }
 
       setSearchResults(results);
@@ -1698,6 +1700,8 @@ export default function BangumiLensApp() {
 
     if (isBangumiEpisodeUrl(trimmedUrl)) {
       setSearchResults([]);
+      setSelectedSearchResult(null);
+      setSearchEpisodes([]);
       startAnalysis(trimmedUrl);
       return;
     }
@@ -1705,10 +1709,50 @@ export default function BangumiLensApp() {
     void searchByTitle(trimmedUrl);
   }
 
-  function selectSearchResult(result: SearchResult) {
+  async function selectSearchResult(result: SearchResult) {
+    setError("");
+    setSelectedSearchResult(result);
+    setSearchEpisodes([]);
+    setLoadingSearchEpisodes(true);
+
+    try {
+      const cachedInfo = subjectInfoById[result.subjectId];
+      let subjectInfo = cachedInfo;
+
+      if (!subjectInfo?.episodes) {
+        const response = await fetch(`/api/subject-info?subjectId=${encodeURIComponent(result.subjectId)}`, {
+          cache: "no-store"
+        });
+        const payload = (await response.json()) as SubjectInfo & { error?: string };
+        if (!response.ok) {
+          throw new Error(payload.error || "章节列表加载失败，请稍后重试。");
+        }
+        subjectInfo = payload;
+        setSubjectInfoById((current) => ({ ...current, [result.subjectId]: payload }));
+      }
+
+      const episodes = (subjectInfo?.episodes || []).map((episode) => ({
+        ...episode,
+        url: buildSearchEpisodeUrl(episode.id)
+      }));
+      if (episodes.length === 0) {
+        throw new Error("这个条目暂时没有可选择的正片章节。");
+      }
+
+      setSearchEpisodes(episodes);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "章节列表加载失败，请稍后重试。");
+    } finally {
+      setLoadingSearchEpisodes(false);
+    }
+  }
+
+  function selectSearchEpisode(episode: SearchEpisodeChoice) {
     setSearchResults([]);
-    setUrl(result.url);
-    startAnalysis(result.url);
+    setSelectedSearchResult(null);
+    setSearchEpisodes([]);
+    setUrl(episode.url);
+    startAnalysis(episode.url);
   }
 
   function useExistingReport() {
@@ -1996,13 +2040,36 @@ export default function BangumiLensApp() {
               {searchResults.map((result) => (
                 <button key={`${result.subjectId}-${result.firstEpisodeId}`} type="button" onClick={() => selectSearchResult(result)}>
                   <span>{getSearchResultTitle(result)}</span>
-                  <strong>{getSearchResultEpisodeLabel(result)}</strong>
+                  <strong>{getSearchResultSubtitle(result)}</strong>
                   {result.episodeTotal ? <em>全 {result.episodeTotal} 话</em> : null}
                 </button>
               ))}
             </div>
           ) : null}
-          <p className="hint">输入作品名会搜索 Bangumi 条目并默认从第一话开始；已有本地报告会优先直接打开。</p>
+          {selectedSearchResult ? (
+            <div className="episode-choice-panel" aria-label="章节选择">
+              <div className="episode-choice-head">
+                <span>选择章节</span>
+                <strong>{getSearchResultTitle(selectedSearchResult)}</strong>
+              </div>
+              {loadingSearchEpisodes ? (
+                <p className="episode-choice-loading">
+                  <Loader2 className="spin" size={16} />
+                  正在加载章节列表
+                </p>
+              ) : (
+                <div className="episode-choice-list">
+                  {searchEpisodes.map((episode) => (
+                    <button key={episode.id} type="button" onClick={() => selectSearchEpisode(episode)}>
+                      <span>{getEpisodeChoiceLabel(episode)}</span>
+                      {episode.airdate ? <em>{episode.airdate}</em> : null}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+          <p className="hint">输入作品名会先搜索 Bangumi 条目；确认作品后再选择具体话数。已有本地报告会在选中章节后提示查看或重新生成。</p>
         </form>
       </section>
 
