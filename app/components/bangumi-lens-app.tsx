@@ -862,7 +862,7 @@ export default function BangumiLensApp() {
 
   const openSavedReport = useCallback(async (item: SavedReport, options?: { replace?: boolean }) => {
     const currentReportUrl = report?.meta.url;
-    const targetReportUrl = getSavedReportMeta(item).url;
+    const targetReportUrl = item.report?.meta.url || item.meta?.url || item.url;
     const shouldMaskSwitch = Boolean(currentReportUrl && targetReportUrl && currentReportUrl !== targetReportUrl);
 
     try {
