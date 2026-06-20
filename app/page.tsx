@@ -849,7 +849,7 @@ export default function Home() {
               <span>{loading ? "分析中" : "生成"}</span>
             </button>
           </div>
-          <p className="hint">只读取公开页面；不需要 Bangumi 登录态。报告会保存在本机浏览器历史中。</p>
+          <p className="hint">只读取公开页面；不需要 Bangumi 登录态。报告存入本机 data/reports/。</p>
         </form>
       </section>
 
