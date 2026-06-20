@@ -60,3 +60,22 @@ test("buildReportStats counts unique main comment and reply authors as participa
     participantCount: 4
   });
 });
+
+test("buildReportStats prefers author ids for participant de-duplication", () => {
+  const { buildReportStats } = requireTypeScriptModule(join(process.cwd(), "lib", "report-stats.ts"));
+  const stats = buildReportStats([
+    {
+      author: "same-name",
+      authorId: "user-a",
+      replyCount: 2,
+      reactionCount: 0,
+      likeCount: 0,
+      replies: [
+        { author: "same-name", authorId: "user-a", text: "same user reply", reactionCount: 0 },
+        { author: "same-name", authorId: "user-b", text: "different user reply", reactionCount: 0 }
+      ]
+    }
+  ]);
+
+  assert.equal(stats.participantCount, 2);
+});

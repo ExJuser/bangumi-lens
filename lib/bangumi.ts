@@ -235,6 +235,46 @@ function extractId($node: cheerio.Cheerio<Element>, fallback: string) {
   return id ? id.replace(/^post_?/, "") : fallback;
 }
 
+function firstTextFrom($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>, selectors: string[]) {
+  for (const selector of selectors) {
+    const value = normalizeText(
+      $node
+        .find(selector)
+        .toArray()
+        .map((node) => $(node).text())
+        .find((text) => normalizeText(text))
+        || ""
+    );
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function extractAuthor($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>) {
+  return (
+    firstTextFrom($, $node, [
+      "a[href^='/user/']",
+      "a[href*='bangumi.tv/user/']",
+      "a[href*='bgm.tv/user/']",
+      ".user a",
+      ".name a",
+      ".user",
+      ".name"
+    ]) || undefined
+  );
+}
+
+function extractAuthorId($node: cheerio.Cheerio<Element>) {
+  const href = $node
+    .find("a[href^='/user/'], a[href*='bangumi.tv/user/'], a[href*='bgm.tv/user/']")
+    .toArray()
+    .map((node) => node.attribs?.href || "")
+    .find((value) => /(?:^|\/)user\/[^/?#]+/.test(value));
+  const userId = href?.match(/(?:^|\/)user\/([^/?#]+)/)?.[1];
+  return userId ? decodeURIComponent(userId) : undefined;
+}
+
 function isElement(node: unknown): node is Element {
   return Boolean(node && typeof node === "object" && "type" in node && (node as { type?: string }).type === "tag");
 }
@@ -247,7 +287,8 @@ function extractReply($: cheerio.CheerioAPI, node: Element, parentId: string, in
 
   return {
     id: `${parentId}-reply-${index + 1}`,
-    author: normalizeText($node.find(".avatarNeue, .l, .user, .name, a[href*='/user/']").first().text()) || undefined,
+    author: extractAuthor($, $node),
+    authorId: extractAuthorId($node),
     text,
     reactionCount: extractCount($node, [".likes", ".reactions", ".emoji", ".tip_j"])
   };
@@ -285,7 +326,8 @@ function extractComment($: cheerio.CheerioAPI, node: Element, index: number): Ba
   return {
     id,
     floor: $node.attr("data-floor") || $node.find(".floor, .no").first().text().trim() || undefined,
-    author: normalizeText($node.find(".avatarNeue, .user, .name, a[href*='/user/']").first().text()) || undefined,
+    author: extractAuthor($, $node),
+    authorId: extractAuthorId($node),
     text: text.slice(0, 1600),
     createdAt: normalizeText($node.find("time, .time, .date").first().text()) || undefined,
     replyCount,

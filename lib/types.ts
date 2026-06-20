@@ -23,6 +23,7 @@ export type BangumiComment = {
   id: string;
   floor?: string;
   author?: string;
+  authorId?: string;
   text: string;
   createdAt?: string;
   replyCount: number;
@@ -40,6 +41,7 @@ export type BangumiReaction = {
 export type BangumiReply = {
   id: string;
   author?: string;
+  authorId?: string;
   text: string;
   reactionCount: number;
 };

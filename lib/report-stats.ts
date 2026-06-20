@@ -1,18 +1,23 @@
 import type { WeightedComment } from "@/lib/types";
 
-function addAuthor(participants: Set<string>, author?: string) {
+function addParticipant(participants: Set<string>, author?: string, authorId?: string) {
+  const normalizedAuthorId = authorId?.trim();
   const normalizedAuthor = author?.trim();
-  if (normalizedAuthor) {
-    participants.add(normalizedAuthor);
+  const participantKey = normalizedAuthorId ? `id:${normalizedAuthorId}` : normalizedAuthor ? `name:${normalizedAuthor}` : "";
+
+  if (participantKey) {
+    participants.add(participantKey);
   }
 }
 
-export function buildReportStats(comments: Pick<WeightedComment, "author" | "replyCount" | "reactionCount" | "likeCount" | "replies">[]) {
+export function buildReportStats(
+  comments: Pick<WeightedComment, "author" | "authorId" | "replyCount" | "reactionCount" | "likeCount" | "replies">[]
+) {
   const participants = new Set<string>();
 
   comments.forEach((comment) => {
-    addAuthor(participants, comment.author);
-    comment.replies.forEach((reply) => addAuthor(participants, reply.author));
+    addParticipant(participants, comment.author, comment.authorId);
+    comment.replies.forEach((reply) => addParticipant(participants, reply.author, reply.authorId));
   });
 
   return {
