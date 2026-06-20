@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Moon,
   Quote,
+  Search,
   Sparkles,
   Star,
   Sun,
@@ -99,6 +100,17 @@ type SubjectInfo = {
   episodeTotal?: number;
 };
 
+type SearchResult = {
+  subjectId: string;
+  title: string;
+  titleCn?: string;
+  episodeTotal?: number;
+  firstEpisodeId: string;
+  firstEpisodeTitle?: string;
+  firstEpisodeNumber?: number;
+  url: string;
+};
+
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
 
 const BANGUMI_EPISODE_PATH = /^\/ep\/(\d+)\/?$/;
@@ -118,6 +130,15 @@ function getComparableEpisodeUrl(input: string) {
   return input.trim();
 }
 
+function isBangumiEpisodeUrl(input: string) {
+  try {
+    const parsedUrl = new URL(input.trim());
+    return BANGUMI_HOSTS.has(parsedUrl.hostname) && BANGUMI_EPISODE_PATH.test(parsedUrl.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function findExistingReport(history: SavedReport[], candidateUrl: string) {
   const comparableUrl = getComparableEpisodeUrl(candidateUrl);
   return history.find((item) => {
@@ -125,6 +146,32 @@ function findExistingReport(history: SavedReport[], candidateUrl: string) {
     const metaUrl = getComparableEpisodeUrl(getSavedReportMeta(item).url);
     return itemUrl === comparableUrl || metaUrl === comparableUrl;
   });
+}
+
+function normalizeSearchText(text: string) {
+  return text.trim().toLocaleLowerCase("zh-CN").replace(/\s+/g, " ");
+}
+
+function findHistoryByTitle(history: SavedReport[], query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return undefined;
+
+  return history.find((item) => {
+    const meta = getSavedReportMeta(item);
+    return [meta.subjectTitleCn, meta.subjectTitle, meta.title, getHistoryEpisodeLabelFromMeta(meta)]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => normalizeSearchText(value).includes(normalizedQuery));
+  });
+}
+
+function getSearchResultTitle(result: SearchResult) {
+  return result.titleCn || result.title;
+}
+
+function getSearchResultEpisodeLabel(result: SearchResult) {
+  const episodeNumber =
+    typeof result.firstEpisodeNumber === "number" ? `第 ${formatEpisodeNumber(result.firstEpisodeNumber)} 话` : "第 1 话";
+  return result.firstEpisodeTitle ? `${episodeNumber} ${result.firstEpisodeTitle}` : episodeNumber;
 }
 
 const EMPTY_PREVIEW_ITEMS = [
@@ -464,6 +511,8 @@ export default function Home() {
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const autoAnalyzeUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -648,6 +697,7 @@ export default function Home() {
   }, [history, report]);
 
   const currentKnownEpisodeTotal = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId]?.episodeTotal : undefined;
+  const bangumiSourceUrl = isBangumiEpisodeUrl(url) ? getComparableEpisodeUrl(url) : "";
 
   const runAnalysis = useCallback(async (trimmedUrl: string) => {
     setError("");
@@ -721,6 +771,47 @@ export default function Home() {
     void runAnalysis(trimmedUrl);
   }, [history, runAnalysis]);
 
+  async function searchByTitle(query: string) {
+    const existingReport = findHistoryByTitle(history, query);
+    if (existingReport) {
+      await openSavedReport(existingReport);
+      return;
+    }
+
+    setError("");
+    setSearchResults([]);
+    setSearching(true);
+
+    try {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+      const payload = (await response.json()) as { results?: SearchResult[]; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "搜索失败，请稍后重试。");
+      }
+
+      const results = payload.results || [];
+      if (results.length === 0) {
+        throw new Error("没有找到匹配的 Bangumi 条目，请试试更完整的作品名。");
+      }
+
+      const exactResult = results.find((result) =>
+        [result.titleCn, result.title].some((title) => title && normalizeSearchText(title) === normalizeSearchText(query))
+      );
+      const directResult = exactResult || (results.length === 1 ? results[0] : undefined);
+      if (directResult) {
+        setUrl(directResult.url);
+        startAnalysis(directResult.url);
+        return;
+      }
+
+      setSearchResults(results);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "搜索失败，请稍后重试。");
+    } finally {
+      setSearching(false);
+    }
+  }
+
   useEffect(() => {
     if (!historyLoaded || loading) return;
 
@@ -736,7 +827,21 @@ export default function Home() {
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedUrl = url.trim();
-    startAnalysis(trimmedUrl);
+    if (!trimmedUrl) return;
+
+    if (isBangumiEpisodeUrl(trimmedUrl)) {
+      setSearchResults([]);
+      startAnalysis(trimmedUrl);
+      return;
+    }
+
+    void searchByTitle(trimmedUrl);
+  }
+
+  function selectSearchResult(result: SearchResult) {
+    setSearchResults([]);
+    setUrl(result.url);
+    startAnalysis(result.url);
   }
 
   function useExistingReport() {
@@ -884,21 +989,44 @@ export default function Home() {
         </div>
 
         <form className="analyze-box" onSubmit={analyze}>
-          <label htmlFor="episode-url">Bangumi 章节链接</label>
+          <label htmlFor="episode-url">Bangumi 章节链接或作品名</label>
           <div className="input-row">
             <input
               id="episode-url"
-              placeholder="https://bgm.tv/ep/123456"
+              placeholder="输入作品名或 https://bgm.tv/ep/123456"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
-              disabled={loading}
+              disabled={loading || searching}
             />
-            <button disabled={loading || !url.trim()} type="submit">
-              {loading ? <Loader2 className="spin" size={18} /> : <ArrowRight size={18} />}
-              <span>{loading ? "分析中" : "生成"}</span>
+            {bangumiSourceUrl ? (
+              <a className="source-link-button" href={bangumiSourceUrl} rel="noreferrer" target="_blank" title="打开 Bangumi 原页">
+                <ExternalLink size={18} />
+                <span>原页</span>
+              </a>
+            ) : null}
+            <button disabled={loading || searching || !url.trim()} type="submit">
+              {loading || searching ? (
+                <Loader2 className="spin" size={18} />
+              ) : isBangumiEpisodeUrl(url) ? (
+                <ArrowRight size={18} />
+              ) : (
+                <Search size={18} />
+              )}
+              <span>{loading ? "分析中" : searching ? "搜索中" : isBangumiEpisodeUrl(url) ? "生成" : "搜索"}</span>
             </button>
           </div>
-          <p className="hint">只读取公开页面；不需要 Bangumi 登录态。报告存入本机 data/reports/。</p>
+          {searchResults.length > 0 ? (
+            <div className="search-results" aria-label="搜索结果">
+              {searchResults.map((result) => (
+                <button key={`${result.subjectId}-${result.firstEpisodeId}`} type="button" onClick={() => selectSearchResult(result)}>
+                  <span>{getSearchResultTitle(result)}</span>
+                  <strong>{getSearchResultEpisodeLabel(result)}</strong>
+                  {result.episodeTotal ? <em>全 {result.episodeTotal} 话</em> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <p className="hint">输入作品名会搜索 Bangumi 条目并默认从第一话开始；已有本地报告会优先直接打开。</p>
         </form>
       </section>
 
