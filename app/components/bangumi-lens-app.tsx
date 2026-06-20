@@ -555,7 +555,7 @@ function getReportIdFromPath(pathname: string) {
   return decodeURIComponent(pathname.slice(REPORT_ROUTE_PREFIX.length).split("/")[0] || "");
 }
 
-export default function BangumiLensApp({ children }: { children?: React.ReactNode }) {
+export default function BangumiLensApp() {
   const router = useRouter();
   const pathname = usePathname();
   const [url, setUrl] = useState("");
@@ -1120,7 +1120,6 @@ export default function BangumiLensApp({ children }: { children?: React.ReactNod
           {theme === "day" ? <Moon size={17} /> : <Sun size={17} />}
           <span>{theme === "day" ? "夜间模式" : "日间模式"}</span>
         </button>
-      {children}
       </div>
       <section className={report ? "hero hero-report" : "hero"}>
         <div className="hero-copy">

@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   description: "辅助阅读 Bangumi 动画章节评论区的单集报告生成器"
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children: _children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
       <body>
-        <BangumiLensApp>{children}</BangumiLensApp>
+        <BangumiLensApp />
       </body>
     </html>
   );
