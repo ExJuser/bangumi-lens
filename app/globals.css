@@ -247,9 +247,9 @@ input {
 
 .hero-report {
   grid-template-columns: minmax(0, 1fr) minmax(620px, 720px);
-  align-items: end;
+  align-items: start;
   min-height: 240px;
-  padding-bottom: 18px;
+  padding: 30px 0 18px;
 }
 
 .hero-report .hero-copy h1 {
@@ -277,7 +277,8 @@ input {
 }
 
 .hero-report .analyze-box {
-  align-self: end;
+  align-self: start;
+  margin-top: 34px;
   box-shadow: none;
 }
 
