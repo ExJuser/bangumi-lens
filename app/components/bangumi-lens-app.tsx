@@ -961,7 +961,7 @@ export default function BangumiLensApp({ children }: { children?: React.ReactNod
     if (!historyLoaded) return;
 
     async function openRouteReport() {
-      const routeReportId = getReportIdFromPath(window.location.pathname);
+      const routeReportId = getReportIdFromPath(pathname);
       if (!routeReportId) {
         loadedRouteReportIdRef.current = null;
         return;
@@ -969,20 +969,11 @@ export default function BangumiLensApp({ children }: { children?: React.ReactNod
 
       if (loadedRouteReportIdRef.current === routeReportId) return;
       const routeItem = history.find((item) => item.id === routeReportId) || { id: routeReportId } as SavedReport;
-      loadedRouteReportIdRef.current = routeReportId;
       await openSavedReport(routeItem, { replace: true });
     }
 
     void openRouteReport();
-
-    function handlePopState() {
-      loadedRouteReportIdRef.current = null;
-      void openRouteReport();
-    }
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [history, historyLoaded, openSavedReport]);
+  }, [history, historyLoaded, openSavedReport, pathname]);
 
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
