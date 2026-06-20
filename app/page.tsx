@@ -18,7 +18,7 @@ import {
   Sun,
   ThumbsUp
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "./components/confirm-dialog";
 
 type ReportItem = {
@@ -100,6 +100,32 @@ type SubjectInfo = {
 };
 
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
+
+const BANGUMI_EPISODE_PATH = /^\/ep\/(\d+)\/?$/;
+const BANGUMI_HOSTS = new Set(["bgm.tv", "bangumi.tv", "chii.in", "www.bgm.tv", "www.bangumi.tv", "www.chii.in"]);
+
+function getComparableEpisodeUrl(input: string) {
+  try {
+    const parsedUrl = new URL(input.trim());
+    const episodeMatch = parsedUrl.pathname.match(BANGUMI_EPISODE_PATH);
+    if (BANGUMI_HOSTS.has(parsedUrl.hostname) && episodeMatch) {
+      return `https://bgm.tv/ep/${episodeMatch[1]}`;
+    }
+  } catch {
+    // Keep the raw value for validation in the analyze API.
+  }
+
+  return input.trim();
+}
+
+function findExistingReport(history: SavedReport[], candidateUrl: string) {
+  const comparableUrl = getComparableEpisodeUrl(candidateUrl);
+  return history.find((item) => {
+    const itemUrl = getComparableEpisodeUrl(item.url);
+    const metaUrl = getComparableEpisodeUrl(getSavedReportMeta(item).url);
+    return itemUrl === comparableUrl || metaUrl === comparableUrl;
+  });
+}
 
 const EMPTY_PREVIEW_ITEMS = [
   {
@@ -434,6 +460,8 @@ export default function Home() {
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const autoAnalyzeUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     async function loadHistory() {
@@ -445,6 +473,8 @@ export default function Home() {
         }
       } catch {
         setHistory([]);
+      } finally {
+        setHistoryLoaded(true);
       }
     }
 
@@ -616,7 +646,7 @@ export default function Home() {
 
   const currentKnownEpisodeTotal = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId]?.episodeTotal : undefined;
 
-  async function runAnalysis(trimmedUrl: string) {
+  const runAnalysis = useCallback(async (trimmedUrl: string) => {
     setError("");
     setReport(null);
     setStreamingText("");
@@ -676,18 +706,34 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  function analyze(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedUrl = url.trim();
-    const existingReport = history.find((item) => item.url === trimmedUrl || getSavedReportMeta(item).url === trimmedUrl);
+  const startAnalysis = useCallback((trimmedUrl: string) => {
+    const existingReport = findExistingReport(history, trimmedUrl);
     if (existingReport) {
       setPendingDuplicate(existingReport);
       return;
     }
 
     void runAnalysis(trimmedUrl);
+  }, [history, runAnalysis]);
+
+  useEffect(() => {
+    if (!historyLoaded || loading) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const queryUrl = (params.get("url") || params.get("episodeUrl") || "").trim();
+    if (!queryUrl || autoAnalyzeUrlRef.current === queryUrl) return;
+
+    autoAnalyzeUrlRef.current = queryUrl;
+    setUrl(queryUrl);
+    startAnalysis(queryUrl);
+  }, [historyLoaded, loading, startAnalysis]);
+
+  function analyze(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedUrl = url.trim();
+    startAnalysis(trimmedUrl);
   }
 
   function useExistingReport() {

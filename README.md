@@ -38,11 +38,13 @@ app/
   page.tsx          # 主页面和交互逻辑
 lib/
   bangumi.ts        # Bangumi 页面和评分解析
-  report.ts         # 模型调用、提示词和报告解析
+  report.ts         # 模型调用和报告解析
+  report-prompt.ts  # 提示词配置加载
   weights.ts        # 评论权重与摘要输入构建
   history-store.ts  # 本地历史存储
   proxy.ts          # 代理配置
   web-search.ts     # 公开网页检索辅助信息
+config/             # 用户可调整的配置文件
 test/               # 单元测试
 data/               # 本地生成的报告历史
 logs/               # 运行日志
@@ -88,6 +90,29 @@ http://localhost:3000
 https://bgm.tv/ep/123456
 ```
 
+也可以用 URL 参数直接打开并自动分析：
+
+```text
+http://localhost:3000/?url=https%3A%2F%2Fbgm.tv%2Fep%2F123456
+```
+
+## 从 Bangumi 页面打开
+
+仓库提供了一个 Tampermonkey / Violentmonkey 用户脚本，用来在 Bangumi 单集页面添加“Bangumi Lens 分析”按钮：
+
+```text
+public/bangumi-lens.user.js
+```
+
+使用方式：
+
+1. 先启动本地服务：`npm run dev`。
+2. 在浏览器的用户脚本管理器中新建脚本，粘贴 `public/bangumi-lens.user.js` 的内容并保存。
+3. 打开任意 Bangumi 章节页，例如 `https://bgm.tv/ep/123456`。
+4. 点击页面标题旁的“Bangumi Lens 分析”按钮，会打开 `http://localhost:3000/?url=...` 并自动进入分析流程。
+
+如果你的应用部署在其他地址，修改脚本里的 `APP_URL` 即可。
+
 ## 环境变量
 
 | 变量 | 必填 | 默认值 | 说明 |
@@ -104,6 +129,15 @@ BANGUMI_LENS_PROXY=http://127.0.0.1:7897
 ```
 
 请按你本机代理软件的实际端口调整地址。
+
+## 提示词配置
+
+模型提示词放在 `config/report-prompt.json`：
+
+- `system`：系统提示词。可以使用 `{{responseJsonSchema}}` 占位符，运行时会替换为报告 JSON 结构要求。
+- `task`：发送给模型的分析任务说明。可以调整报告口吻、长度、栏目数量和引用规则。
+
+修改该文件后需要重启开发服务器。建议保留返回合法 JSON、字段名和引用来源相关要求，否则模型输出可能无法通过结构校验。
 
 ## 可用脚本
 
@@ -145,6 +179,8 @@ npm run lint
 4. 应用会先抓取公开页面，解析评论和评分，再调用模型生成报告。
 5. 报告生成后会自动保存到本机历史记录。
 6. 左侧历史栏会按动画标题归档，点击即可回看旧报告。
+
+如果是从 Bangumi 页面上的用户脚本按钮进入，应用会自动填入当前章节链接并开始分析；如果本地已经有同一章节报告，会提示查看旧报告或重新生成。
 
 如果同一个章节已经生成过报告，应用会提示你查看旧报告或重新生成。重新生成会用当前公开页面内容重新分析，并覆盖旧记录。
 

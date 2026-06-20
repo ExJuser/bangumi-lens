@@ -384,7 +384,7 @@ input {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
   gap: 24px;
-  align-items: end;
+  align-items: flex-end;
   margin-bottom: 16px;
 }
 
