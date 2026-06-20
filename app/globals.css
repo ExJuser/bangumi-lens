@@ -245,6 +245,42 @@ input {
   line-height: 1.7;
 }
 
+.hero-report {
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.62fr);
+  align-items: end;
+  min-height: 240px;
+  padding-bottom: 18px;
+}
+
+.hero-report .hero-copy h1 {
+  max-width: 980px;
+  margin: 8px 0 8px;
+  font-size: clamp(42px, 5vw, 70px);
+  font-weight: 820;
+  line-height: 1.03;
+}
+
+.hero-subject-title {
+  max-width: 920px;
+  margin: 16px 0 0;
+  color: var(--ink);
+  font-size: clamp(20px, 2.1vw, 30px);
+  font-weight: 780;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+.hero-report-note {
+  color: var(--accent-dark) !important;
+  font-size: 16px !important;
+  font-weight: 800;
+}
+
+.hero-report .analyze-box {
+  align-self: end;
+  box-shadow: none;
+}
+
 .eyebrow,
 .label {
   display: inline-flex;
@@ -607,15 +643,15 @@ input {
 }
 
 .report-shell {
-  margin-top: 30px;
+  margin-top: 12px;
 }
 
 .report-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
-  align-items: flex-end;
-  margin-bottom: 18px;
+  align-items: center;
+  margin-bottom: 22px;
 }
 
 .report-header h2 {
@@ -641,7 +677,7 @@ input {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .episode-nav button {
@@ -1403,6 +1439,10 @@ input {
 @media (max-width: 560px) {
   .hero-copy h1 {
     font-size: 34px;
+  }
+
+  .hero-report .hero-copy h1 {
+    font-size: 38px;
   }
 
   .input-row {

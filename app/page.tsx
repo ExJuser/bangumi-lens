@@ -1012,16 +1012,30 @@ export default function Home() {
           <span>{theme === "day" ? "夜间模式" : "日间模式"}</span>
         </button>
       </div>
-      <section className="hero">
+      <section className={report ? "hero hero-report" : "hero"}>
         <div className="hero-copy">
-          <div className="eyebrow">
-            <Eye size={16} />
-            Bangumi Lens
-          </div>
-          <h1>把单集评论区整理成一份可复盘的阅读报告</h1>
-          <p>
-            输入 Bangumi 章节链接，聚合公开评论、楼中楼回复、表情和点赞信号，生成剧情简述、主流观点、讨论热点与共鸣吐槽。
-          </p>
+          {report ? (
+            <>
+              <div className="eyebrow">
+                <Eye size={16} />
+                Bangumi Lens / Episode Report
+              </div>
+              {report.meta.subjectTitle ? <p className="hero-subject-title">{report.meta.subjectTitle}</p> : null}
+              <h1>{report.meta.title}</h1>
+              <p className="hero-report-note">单集评论区阅读报告</p>
+            </>
+          ) : (
+            <>
+              <div className="eyebrow">
+                <Eye size={16} />
+                Bangumi Lens
+              </div>
+              <h1>把单集评论区整理成一份可复盘的阅读报告</h1>
+              <p>
+                输入 Bangumi 章节链接，聚合公开评论、楼中楼回复、表情和点赞信号，生成剧情简述、主流观点、讨论热点与共鸣吐槽。
+              </p>
+            </>
+          )}
         </div>
 
         <form className="analyze-box" onSubmit={analyze}>
@@ -1140,9 +1154,6 @@ export default function Home() {
             return (
           <div className="report-header">
             <div className="report-title-block">
-              <span className="label">Episode Report</span>
-              <h2>{report.meta.title}</h2>
-              {report.meta.subjectTitle ? <p>{report.meta.subjectTitle}</p> : null}
               <div className="episode-nav" aria-label="章节导航">
                 <button
                   type="button"
