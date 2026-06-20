@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   ArrowRight,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Trash2,
@@ -459,6 +460,28 @@ function getHistoryEpisodeLabel(report: Report) {
   return getHistoryEpisodeLabelFromMeta(report.meta);
 }
 
+function formatSavedAt(savedAt: string) {
+  const savedTime = new Date(savedAt).getTime();
+  if (!Number.isFinite(savedTime)) return "";
+
+  const elapsedMs = Date.now() - savedTime;
+  if (elapsedMs < 60_000) return "刚刚";
+
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (elapsedMs < hour) return `${Math.floor(elapsedMs / minute)} 分`;
+  if (elapsedMs < day) return `${Math.floor(elapsedMs / hour)} 小时`;
+  if (elapsedMs < 2 * day) return "昨天";
+  if (elapsedMs < 30 * day) return `${Math.floor(elapsedMs / day)} 天`;
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric"
+  }).format(new Date(savedTime));
+}
+
 function getHistoryEpisodeLabelFromMeta(meta: Report["meta"]) {
   if (typeof meta.episodeNumber !== "number") {
     return meta.title;
@@ -575,6 +598,7 @@ export default function BangumiLensApp() {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [reportSwitching, setReportSwitching] = useState(false);
+  const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(() => new Set());
   const autoAnalyzeUrlRef = useRef<string | null>(null);
   const loadedRouteReportIdRef = useRef<string | null>(null);
   const reportSwitchingFrameRef = useRef<number | null>(null);
@@ -870,6 +894,16 @@ export default function BangumiLensApp() {
     ] as const);
   }, [history]);
 
+  useEffect(() => {
+    setCollapsedSubjects((current) => {
+      if (current.size === 0) return current;
+
+      const availableSubjects = new Set(groupedHistory.map(([subjectName]) => subjectName));
+      const next = new Set([...current].filter((subjectName) => availableSubjects.has(subjectName)));
+      return next.size === current.size ? current : next;
+    });
+  }, [groupedHistory]);
+
   const currentSubjectHistory = useMemo(() => {
     if (!report) return [];
     return sortSavedReportsByEpisode(history.filter((item) => getSubjectNameFromMeta(getSavedReportMeta(item)) === getSubjectName(report)));
@@ -1101,6 +1135,18 @@ export default function BangumiLensApp() {
     void runAnalysis(generationUrl);
   }
 
+  function toggleHistoryGroup(subjectName: string) {
+    setCollapsedSubjects((current) => {
+      const next = new Set(current);
+      if (next.has(subjectName)) {
+        next.delete(subjectName);
+      } else {
+        next.add(subjectName);
+      }
+      return next;
+    });
+  }
+
   return (
     <main className="app-shell">
       {reportSwitching ? <div className="report-switch-mask" aria-hidden="true" /> : null}
@@ -1113,42 +1159,67 @@ export default function BangumiLensApp() {
         </div>
         {groupedHistory.length > 0 ? (
           <div className="history-groups">
-            {groupedHistory.map(([subjectName, items]) => (
-              <section className="history-group" key={subjectName}>
-                <h2>{subjectName}</h2>
-                <div className="history-items">
-                  {items.map((item) => (
-                    <button
-                      className={report?.meta.url === getSavedReportMeta(item).url ? "history-item active" : "history-item"}
-                      key={item.id}
-                      type="button"
-                      onClick={() => void openSavedReport(item)}
-                    >
-                      <span>{getHistoryEpisodeLabelFromMeta(getSavedReportMeta(item))}</span>
-                      <span
-                        className="history-delete"
-                        role="button"
-                        tabIndex={0}
-                        title="删除这条历史"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setDeleteHistoryPrompt(item);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            setDeleteHistoryPrompt(item);
-                          }
-                        }}
-                      >
-                        <Trash2 size={15} />
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
+            {groupedHistory.map(([subjectName, items]) => {
+              const isCollapsed = collapsedSubjects.has(subjectName);
+
+              return (
+                <section className="history-group" key={subjectName}>
+                  <button
+                    aria-expanded={!isCollapsed}
+                    className="history-group-toggle"
+                    type="button"
+                    onClick={() => toggleHistoryGroup(subjectName)}
+                  >
+                    <span className="history-group-name">
+                      {isCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                      <span>{subjectName}</span>
+                    </span>
+                    <span className="history-group-count">{items.length}</span>
+                  </button>
+                  {!isCollapsed ? (
+                    <div className="history-items">
+                      {items.map((item) => {
+                        const meta = getSavedReportMeta(item);
+                        const savedAtLabel = formatSavedAt(item.savedAt);
+
+                        return (
+                          <button
+                            className={report?.meta.url === meta.url ? "history-item active" : "history-item"}
+                            key={item.id}
+                            type="button"
+                            onClick={() => void openSavedReport(item)}
+                          >
+                            <span className="history-item-label">{getHistoryEpisodeLabelFromMeta(meta)}</span>
+                            <span className="history-item-meta">
+                              {savedAtLabel ? <span className="history-saved-at">{savedAtLabel}</span> : null}
+                              <span
+                                className="history-delete"
+                                role="button"
+                                tabIndex={0}
+                                title="删除这条历史"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setDeleteHistoryPrompt(item);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    setDeleteHistoryPrompt(item);
+                                  }
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })}
           </div>
         ) : (
           <p className="history-empty">生成报告后会按动画标题保存在这里。</p>
