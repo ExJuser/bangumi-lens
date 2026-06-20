@@ -465,6 +465,22 @@ function getHistoryEpisodeLabelFromMeta(meta: Report["meta"]) {
   return `第 ${formatEpisodeNumber(meta.episodeNumber)} 话 ${meta.title}`;
 }
 
+function getHeroEpisodeTitle(meta: Report["meta"]) {
+  if (typeof meta.episodeNumber !== "number") {
+    return meta.title;
+  }
+
+  const episodeLabel = `第 ${formatEpisodeNumber(meta.episodeNumber)} 话`;
+  const compactEpisodeLabel = episodeLabel.replace(/\s+/g, "");
+  const title = meta.title.trim();
+
+  if (title.startsWith(episodeLabel) || title.startsWith(compactEpisodeLabel)) {
+    return title;
+  }
+
+  return `${episodeLabel} ${title}`;
+}
+
 function sortSavedReportsByEpisode(items: SavedReport[]) {
   return [...items].sort((a, b) => {
     const episodeDiff = getEpisodeSortValue(a) - getEpisodeSortValue(b);
@@ -1102,7 +1118,7 @@ export default function Home() {
                 Bangumi Lens / Episode Report
               </div>
               {report.meta.subjectTitle ? <p className="hero-subject-title">{report.meta.subjectTitle}</p> : null}
-              <h1>{report.meta.title}</h1>
+              <h1>{getHeroEpisodeTitle(report.meta)}</h1>
             </>
           ) : (
             <>
