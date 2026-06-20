@@ -385,6 +385,63 @@ input {
   -webkit-line-clamp: 4;
 }
 
+.hero-report .hero-copy .hero-episode-title {
+  position: relative;
+  display: block;
+  overflow: visible;
+  outline: none;
+}
+
+.hero-report .hero-copy .hero-episode-title > span:first-child {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.hero-title-translation {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  z-index: 8;
+  display: grid;
+  gap: 5px;
+  width: min(560px, calc(100vw - 48px));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.hero-title-translation strong {
+  font-size: 16px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.hero-title-translation em {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.hero-episode-title:hover .hero-title-translation,
+.hero-episode-title:focus .hero-title-translation,
+.hero-episode-title:focus-within .hero-title-translation {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .hero-subject-title {
   max-width: 920px;
   margin: 16px 0 0;

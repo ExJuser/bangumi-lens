@@ -59,6 +59,7 @@ type Report = {
     nextEpisodeId?: string | null;
     subjectId?: string;
     title: string;
+    episodeTitleCn?: string;
     subjectTitle?: string;
     subjectTitleCn?: string;
     episodeTotal?: number;
@@ -155,6 +156,20 @@ type EpisodeDirection = "previous" | "next";
 type MissingEpisodePrompt = {
   direction: EpisodeDirection;
   url?: string;
+};
+type EpisodeTitleTranslationSource = "official" | "ai";
+type EpisodeTitleTranslationState = {
+  status: "loading" | "ready" | "needs-ai" | "error";
+  translation?: string;
+  source?: EpisodeTitleTranslationSource;
+  error?: string;
+};
+type PendingAiTitleTranslation = {
+  episodeId: string;
+  title: string;
+  subjectTitle?: string;
+  subjectTitleCn?: string;
+  episodeNumber?: number;
 };
 
 type SubjectInfo = {
@@ -560,6 +575,86 @@ function getHeroEpisodeTitle(meta: Report["meta"]) {
   return `${episodeLabel} ${title}`;
 }
 
+function getHeroEpisodeTitleTranslation(meta: Report["meta"], translationState?: EpisodeTitleTranslationState) {
+  if (meta.episodeTitleCn?.trim()) {
+    return {
+      status: "ready" as const,
+      translation: formatHeroEpisodeTitle(meta, meta.episodeTitleCn.trim()),
+      source: "official" as const
+    };
+  }
+
+  if (translationState?.status === "ready" && translationState.translation?.trim()) {
+    return {
+      ...translationState,
+      translation: formatHeroEpisodeTitle(meta, translationState.translation.trim())
+    };
+  }
+
+  return translationState;
+}
+
+function HeroEpisodeTitle({
+  meta,
+  translationState,
+  onRequestTranslation
+}: {
+  meta: Report["meta"];
+  translationState?: EpisodeTitleTranslationState;
+  onRequestTranslation: (meta: Report["meta"], allowAi: boolean) => void;
+}) {
+  const title = getHeroEpisodeTitle(meta);
+  const translation = getHeroEpisodeTitleTranslation(meta, translationState);
+  const translationStatus = translation?.status || "idle";
+
+  function requestTranslation() {
+    onRequestTranslation(meta, false);
+  }
+
+  return (
+    <h1
+      className="hero-episode-title"
+      tabIndex={0}
+      title={title}
+      onFocus={requestTranslation}
+      onMouseEnter={requestTranslation}
+    >
+      <span>{title}</span>
+      <span className={`hero-title-translation is-${translationStatus}`} role="tooltip">
+        {translation?.status === "ready" ? (
+          <>
+            <strong>{translation.translation}</strong>
+            <em>{translation.source === "official" ? "Bangumi 官方中文名" : "AI 翻译"}</em>
+          </>
+        ) : translation?.status === "needs-ai" ? (
+          <>
+            <strong>Bangumi 官方暂无中文名</strong>
+            <em>确认后可调用模型 API 翻译</em>
+          </>
+        ) : translation?.status === "error" ? (
+          <>
+            <strong>标题翻译失败</strong>
+            <em>{translation.error || "请稍后重试"}</em>
+          </>
+        ) : (
+          <>
+            <strong>正在查询中文标题</strong>
+            <em>优先使用 Bangumi 官方数据</em>
+          </>
+        )}
+      </span>
+    </h1>
+  );
+}
+
+function formatHeroEpisodeTitle(meta: Report["meta"], title: string) {
+  if (typeof meta.episodeNumber !== "number") {
+    return title;
+  }
+
+  return `第 ${formatEpisodeNumber(meta.episodeNumber)} 话 ${title}`;
+}
+
 function sortSavedReportsByEpisode(items: SavedReport[]) {
   return [...items].sort((a, b) => {
     const episodeDiff = getEpisodeSortValue(a) - getEpisodeSortValue(b);
@@ -646,6 +741,8 @@ export default function BangumiLensApp() {
   const [pendingDuplicate, setPendingDuplicate] = useState<SavedReport | null>(null);
   const [pendingAutoAnalyzeUrl, setPendingAutoAnalyzeUrl] = useState("");
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
+  const [pendingAiTitleTranslation, setPendingAiTitleTranslation] = useState<PendingAiTitleTranslation | null>(null);
+  const [episodeTitleTranslations, setEpisodeTitleTranslations] = useState<Record<string, EpisodeTitleTranslationState>>({});
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -820,6 +917,19 @@ export default function BangumiLensApp() {
   }, [deleteHistoryPrompt]);
 
   useEffect(() => {
+    if (!pendingAiTitleTranslation) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPendingAiTitleTranslation(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pendingAiTitleTranslation]);
+
+  useEffect(() => {
     const subjectId = report?.meta.subjectId;
     if (!subjectId || report?.meta.episodeTotal || subjectInfoById[subjectId]) return;
 
@@ -863,6 +973,7 @@ export default function BangumiLensApp() {
     setMissingEpisodePrompt(null);
     setPendingDuplicate(null);
     setPendingAutoAnalyzeUrl("");
+    setPendingAiTitleTranslation(null);
     router.push("/");
   }
 
@@ -967,6 +1078,105 @@ export default function BangumiLensApp() {
 
   const currentKnownEpisodeTotal = report?.meta.subjectId ? subjectInfoById[report.meta.subjectId]?.episodeTotal : undefined;
   const bangumiSourceUrl = isBangumiEpisodeUrl(url) ? getComparableEpisodeUrl(url) : "";
+  const requestEpisodeTitleTranslation = useCallback(async (meta: Report["meta"], allowAi: boolean) => {
+    if (!allowAi && meta.episodeTitleCn?.trim()) return;
+    const existingState = episodeTitleTranslations[meta.episodeId];
+    if (!allowAi && existingState?.status === "needs-ai") {
+      setPendingAiTitleTranslation({
+        episodeId: meta.episodeId,
+        title: meta.title,
+        subjectTitle: meta.subjectTitle,
+        subjectTitleCn: meta.subjectTitleCn,
+        episodeNumber: meta.episodeNumber
+      });
+      return;
+    }
+
+    if (!allowAi && (existingState?.status === "loading" || existingState?.status === "ready")) {
+      return;
+    }
+
+    setEpisodeTitleTranslations((current) => ({
+      ...current,
+      [meta.episodeId]: { status: "loading" }
+    }));
+
+    try {
+      const response = await fetch("/api/episode-translation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          episodeId: meta.episodeId,
+          title: meta.title,
+          subjectTitle: meta.subjectTitle,
+          subjectTitleCn: meta.subjectTitleCn,
+          episodeNumber: meta.episodeNumber,
+          allowAi
+        })
+      });
+      const payload = (await response.json()) as {
+        translation?: string;
+        source?: EpisodeTitleTranslationSource;
+        needsAiConfirmation?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "标题翻译失败，请稍后重试。");
+      }
+
+      if (payload.translation && payload.source) {
+        setEpisodeTitleTranslations((current) => ({
+          ...current,
+          [meta.episodeId]: {
+            status: "ready",
+            translation: payload.translation,
+            source: payload.source
+          }
+        }));
+        return;
+      }
+
+      if (payload.needsAiConfirmation) {
+        setEpisodeTitleTranslations((current) => ({
+          ...current,
+          [meta.episodeId]: { status: "needs-ai" }
+        }));
+        setPendingAiTitleTranslation({
+          episodeId: meta.episodeId,
+          title: meta.title,
+          subjectTitle: meta.subjectTitle,
+          subjectTitleCn: meta.subjectTitleCn,
+          episodeNumber: meta.episodeNumber
+        });
+      }
+    } catch (caught) {
+      setEpisodeTitleTranslations((current) => ({
+        ...current,
+        [meta.episodeId]: {
+          status: "error",
+          error: caught instanceof Error ? caught.message : "标题翻译失败，请稍后重试。"
+        }
+      }));
+    }
+  }, [episodeTitleTranslations]);
+
+  function confirmAiTitleTranslation() {
+    if (!pendingAiTitleTranslation || !report) return;
+    const translationRequest = pendingAiTitleTranslation;
+    setPendingAiTitleTranslation(null);
+    void requestEpisodeTitleTranslation(
+      {
+        ...report.meta,
+        episodeId: translationRequest.episodeId,
+        title: translationRequest.title,
+        subjectTitle: translationRequest.subjectTitle,
+        subjectTitleCn: translationRequest.subjectTitleCn,
+        episodeNumber: translationRequest.episodeNumber
+      },
+      true
+    );
+  }
 
   const runAnalysis = useCallback(async (trimmedUrl: string) => {
     setError("");
@@ -1186,6 +1396,7 @@ export default function BangumiLensApp() {
       return;
     }
 
+
     setMissingEpisodePrompt({
       direction,
       url: buildAdjacentEpisodeUrl(report, direction)
@@ -1313,7 +1524,11 @@ export default function BangumiLensApp() {
                 Bangumi Lens / Episode Report
               </div>
               {report.meta.subjectTitle ? <p className="hero-subject-title">{report.meta.subjectTitle}</p> : null}
-              <h1 title={getHeroEpisodeTitle(report.meta)}>{getHeroEpisodeTitle(report.meta)}</h1>
+              <HeroEpisodeTitle
+                meta={report.meta}
+                translationState={episodeTitleTranslations[report.meta.episodeId]}
+                onRequestTranslation={requestEpisodeTitleTranslation}
+              />
             </>
           ) : (
             <>
@@ -1599,31 +1814,48 @@ export default function BangumiLensApp() {
           ]}
         />
       ) : null}
+      {pendingAiTitleTranslation ? (
+        <ConfirmDialog
+          titleId="title-translation-title"
+          icon={<Sparkles size={20} />}
+          label="AI 翻译"
+          title="调用模型 API 翻译标题？"
+          description={
+            <>
+              Bangumi 官方数据里没有这个章节的中文标题。确认后会调用一次模型 API 生成悬停翻译，可能产生少量费用。
+            </>
+          }
+          onClose={() => setPendingAiTitleTranslation(null)}
+          actions={[
+            { label: "取消", onClick: () => setPendingAiTitleTranslation(null), className: "secondary-action" },
+            { label: "确认翻译", onClick: confirmAiTitleTranslation, className: "primary-action" }
+          ]}
+        />
+      ) : null}
       {missingEpisodePrompt ? (
         <ConfirmDialog
           titleId="missing-episode-title"
           icon={<AlertCircle size={20} />}
-          label="本地未命中"
-          title={<>还没有{getDirectionLabel(missingEpisodePrompt.direction)}的分析结果</>}
+          label="?????"
+          title={<>???{getDirectionLabel(missingEpisodePrompt.direction)}?????</>}
           description={
             <>
-              本地没有保存对应章节的报告。你可以先留在当前报告，也可以现在生成{getDirectionLabel(missingEpisodePrompt.direction)}
-              的分析结果。
+              ????????????????????????????????{getDirectionLabel(missingEpisodePrompt.direction)}
+              ??????
             </>
           }
           onClose={() => setMissingEpisodePrompt(null)}
           actions={[
-            { label: "暂不生成", onClick: () => setMissingEpisodePrompt(null), className: "secondary-action" },
+            { label: "????", onClick: () => setMissingEpisodePrompt(null), className: "secondary-action" },
             ...(missingEpisodePrompt.url
               ? [
                   {
-                    label: <>生成{getDirectionLabel(missingEpisodePrompt.direction)}</>,
+                    label: <>??{getDirectionLabel(missingEpisodePrompt.direction)}</>,
                     onClick: generateMissingEpisode,
                     className: "primary-action" as const
                   }
                 ]
-              : [])
-          ]}
+              : [])          ]}
         />
       ) : null}
       {deleteHistoryPrompt ? (

@@ -55,12 +55,15 @@ type BangumiEpisodeApiItem = {
   id?: unknown;
   sort?: unknown;
   type?: unknown;
+  name?: unknown;
+  name_cn?: unknown;
 };
 
 type EpisodeNavigationInfo = {
   episodeSort?: number;
   previousEpisodeId?: string | null;
   nextEpisodeId?: string | null;
+  episodeTitleCn?: string;
 };
 
 function parseSubjectId($: cheerio.CheerioAPI) {
@@ -166,9 +169,10 @@ async function fetchEpisodeNavigationInfo(subjectId: string | undefined, episode
     const mainEpisodes = episodes
       .map((episode) => ({
         id: typeof episode.id === "number" || typeof episode.id === "string" ? String(episode.id) : undefined,
-        sort: Number(episode.sort)
+        sort: Number(episode.sort),
+        titleCn: typeof episode.name_cn === "string" && episode.name_cn.trim() ? episode.name_cn.trim() : undefined
       }))
-      .filter((episode): episode is { id: string; sort: number } => Boolean(episode.id) && Number.isFinite(episode.sort))
+      .filter((episode): episode is { id: string; sort: number; titleCn: string | undefined } => Boolean(episode.id) && Number.isFinite(episode.sort))
       .sort((a, b) => a.sort - b.sort || Number(a.id) - Number(b.id));
     const currentIndex = mainEpisodes.findIndex((episode) => episode.id === episodeId);
     if (currentIndex < 0) return {};
@@ -176,10 +180,32 @@ async function fetchEpisodeNavigationInfo(subjectId: string | undefined, episode
     return {
       episodeSort: mainEpisodes[currentIndex].sort,
       previousEpisodeId: mainEpisodes[currentIndex - 1]?.id ?? null,
-      nextEpisodeId: mainEpisodes[currentIndex + 1]?.id ?? null
+      nextEpisodeId: mainEpisodes[currentIndex + 1]?.id ?? null,
+      episodeTitleCn: mainEpisodes[currentIndex].titleCn
     };
   } catch {
     return {};
+  }
+}
+
+export async function fetchBangumiEpisodeTitleCn(episodeId: string) {
+  configureServerProxy();
+
+  try {
+    const response = await fetch(`https://api.bgm.tv/v0/episodes/${encodeURIComponent(episodeId)}`, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/json"
+      },
+      next: { revalidate: 60 * 60 * 24 }
+    });
+
+    if (!response.ok) return undefined;
+
+    const episode = (await response.json()) as BangumiEpisodeApiItem;
+    return typeof episode.name_cn === "string" && episode.name_cn.trim() ? episode.name_cn.trim() : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -459,6 +485,7 @@ function parseEpisode(
       nextEpisodeId: navigationInfo.nextEpisodeId,
       subjectId,
       title,
+      episodeTitleCn: navigationInfo.episodeTitleCn,
       subjectTitle,
       subjectTitleCn: subjectInfo.titleCn,
       episodeTotal: subjectInfo.episodeTotal,

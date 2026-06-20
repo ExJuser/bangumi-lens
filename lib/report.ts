@@ -143,6 +143,15 @@ function createClient(apiKey: string) {
   });
 }
 
+function requireModelApiKey() {
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("缺少 DEEPSEEK_API_KEY，无法调用模型 API。请在 .env.local 中配置后重试。");
+  }
+
+  return apiKey;
+}
+
 function createMessages(meta: EpisodeMeta, comments: WeightedComment[], webContext: WebSearchResult[] = []) {
   const digest = buildCommentDigest(comments);
   const prompt = loadReportPrompt(responseJsonSchema());
@@ -168,6 +177,47 @@ function createMessages(meta: EpisodeMeta, comments: WeightedComment[], webConte
       })
     }
   ];
+}
+
+export async function translateEpisodeTitle(input: {
+  title: string;
+  subjectTitle?: string;
+  subjectTitleCn?: string;
+  episodeNumber?: number;
+}) {
+  configureServerProxy();
+
+  const apiKey = requireModelApiKey();
+  const client = createClient(apiKey);
+  const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content:
+          "你是动画章节标题翻译助手。只把输入的单集标题翻译成自然、简洁的中文，不解释，不添加引号，不输出集数前缀。"
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          title: input.title,
+          subjectTitle: input.subjectTitle,
+          subjectTitleCn: input.subjectTitleCn,
+          episodeNumber: input.episodeNumber
+        })
+      }
+    ],
+    temperature: 0.1
+  });
+
+  const translatedTitle = response.choices[0]?.message.content?.trim().replace(/^["“”'「」]+|["“”'「」]+$/g, "");
+  if (!translatedTitle) {
+    throw new Error("模型 API 未返回可用的标题翻译。");
+  }
+
+  return translatedTitle;
 }
 
 export function parseReportOutput(outputText: string, meta: EpisodeMeta, comments: WeightedComment[]): AnalyzeReport {

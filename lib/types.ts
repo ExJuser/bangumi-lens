@@ -7,6 +7,7 @@ export type EpisodeMeta = {
   nextEpisodeId?: string | null;
   subjectId?: string;
   title: string;
+  episodeTitleCn?: string;
   subjectTitle?: string;
   subjectTitleCn?: string;
   episodeTotal?: number;
