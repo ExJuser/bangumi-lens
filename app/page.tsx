@@ -853,7 +853,7 @@ export default function Home() {
               <span className="label">Report Preview</span>
               <h2>生成后会在这里展开完整阅读报告</h2>
             </div>
-            <p>也可以先从左侧或下方打开最近保存的报告，继续按章节阅读。</p>
+            <p>可从左侧或下方打开最近报告，继续按章节阅读。</p>
           </div>
 
           <div className="preview-grid">
