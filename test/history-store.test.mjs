@@ -145,6 +145,52 @@ test("history storage toggles liked episodes and carries the mark across regener
   });
 });
 
+test("history status reads lightweight index state by normalized episode URL", async () => {
+  await withTempCwd(async () => {
+    const { readHistoryReportStatus, saveHistoryReport, updateHistoryReportLike } = loadHistoryStore();
+    const missingStatus = await readHistoryReportStatus("https://bgm.tv/ep/8");
+    assert.deepEqual(missingStatus, { exists: false });
+
+    const report = makeReport(8);
+    const history = await saveHistoryReport(report, "https://bangumi.tv/ep/8?from=test");
+    await updateHistoryReportLike(history[0].id, true);
+
+    const status = await readHistoryReportStatus("https://chii.in/ep/8");
+    assert.equal(status.exists, true);
+    assert.equal(status.id, history[0].id);
+    assert.equal(status.savedAt, history[0].savedAt);
+    assert.equal(status.liked, true);
+    assert.equal(status.stale, false);
+  });
+});
+
+test("history status marks reports older than fifteen days as stale", async () => {
+  await withTempCwd(async (dir) => {
+    const reportsDir = join(dir, "data", "reports");
+    const staleSavedAt = new Date(Date.now() - 16 * 24 * 60 * 60 * 1000).toISOString();
+    await mkdir(reportsDir, { recursive: true });
+    await writeFile(
+      join(reportsDir, "index.json"),
+      JSON.stringify([
+        {
+          id: "stale-episode",
+          url: "https://bgm.tv/ep/12",
+          savedAt: staleSavedAt,
+          reportPath: "items/stale-episode.json",
+          meta: makeReport(12).meta,
+          stats: makeReport(12).stats
+        }
+      ]),
+      "utf8"
+    );
+
+    const { readHistoryReportStatus } = loadHistoryStore();
+    const status = await readHistoryReportStatus("https://bangumi.tv/ep/12");
+    assert.equal(status.exists, true);
+    assert.equal(status.stale, true);
+  });
+});
+
 test("history storage rejects index report paths outside the items directory", async () => {
   await withTempCwd(async (dir) => {
     const reportsDir = join(dir, "data", "reports");

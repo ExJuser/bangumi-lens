@@ -20,10 +20,53 @@ export type SavedReportIndexItem = {
   stats: AnalyzeReport["stats"];
 };
 
+export type HistoryReportStatus = {
+  exists: boolean;
+  id?: string;
+  savedAt?: string;
+  liked?: boolean;
+  stale?: boolean;
+};
+
 const LEGACY_HISTORY_FILE = path.join(process.cwd(), "data", "reports.json");
 const HISTORY_DIR = path.join(process.cwd(), "data", "reports");
 const HISTORY_INDEX_FILE = path.join(HISTORY_DIR, "index.json");
 const HISTORY_ITEMS_DIR = path.join(HISTORY_DIR, "items");
+const REPORT_STALE_THRESHOLD_MS = 15 * 24 * 60 * 60 * 1000;
+const EPISODE_PATH = /^\/ep\/(\d+)\/?$/;
+const ALLOWED_HOSTS = new Set([
+  "bgm.tv",
+  "bangumi.tv",
+  "chii.in",
+  "www.bgm.tv",
+  "www.bangumi.tv",
+  "www.chii.in"
+]);
+
+function normalizeEpisodeUrl(input: string) {
+  let url: URL;
+
+  try {
+    url = new URL(input.trim());
+  } catch {
+    throw new Error("请输入完整的 Bangumi 章节链接，例如 https://bgm.tv/ep/123456");
+  }
+
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error("仅支持 http 或 https 链接");
+  }
+
+  if (!ALLOWED_HOSTS.has(url.hostname)) {
+    throw new Error("请输入 bgm.tv、bangumi.tv 或 chii.in 的章节链接");
+  }
+
+  const match = url.pathname.match(EPISODE_PATH);
+  if (!match) {
+    throw new Error("链接看起来不是 Bangumi 章节页，请使用 /ep/数字 格式的链接");
+  }
+
+  return `https://bgm.tv/ep/${match[1]}`;
+}
 
 async function ensureHistoryDir() {
   await mkdir(HISTORY_ITEMS_DIR, { recursive: true });
@@ -176,4 +219,31 @@ export async function updateHistoryReportLike(itemId: string, liked: boolean) {
 
   await writeHistoryIndex(nextHistory);
   return nextHistory;
+}
+
+export async function readHistoryReportStatus(inputUrl: string): Promise<HistoryReportStatus> {
+  const normalizedUrl = normalizeEpisodeUrl(inputUrl);
+  const currentHistory = await readHistoryIndex();
+  const item = currentHistory.find((entry) => {
+    try {
+      return normalizeEpisodeUrl(entry.url) === normalizedUrl || normalizeEpisodeUrl(entry.meta.url) === normalizedUrl;
+    } catch {
+      return false;
+    }
+  });
+
+  if (!item) {
+    return { exists: false };
+  }
+
+  const reportTime = new Date(item.savedAt).getTime();
+  const stale = Number.isFinite(reportTime) ? Date.now() - reportTime > REPORT_STALE_THRESHOLD_MS : false;
+
+  return {
+    exists: true,
+    id: item.id,
+    savedAt: item.savedAt,
+    liked: Boolean(item.likedAt),
+    stale
+  };
 }
