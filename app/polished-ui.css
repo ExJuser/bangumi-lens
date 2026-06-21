@@ -68,11 +68,11 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   line-height: 1.5;
 }
 
-:root[data-ui="polished"] button, :root[data-ui="polished"] input {
+:root[data-ui="polished"] button, :root[data-ui="polished"] input, :root[data-ui="polished"] textarea {
   font: inherit;
 }
 
-:root[data-ui="polished"] button, :root[data-ui="polished"] a, :root[data-ui="polished"] input {
+:root[data-ui="polished"] button, :root[data-ui="polished"] a, :root[data-ui="polished"] input, :root[data-ui="polished"] textarea {
   -webkit-tap-highlight-color: transparent;
 }
 

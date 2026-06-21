@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Edit3,
   Trash2,
   ExternalLink,
   Eye,
@@ -324,6 +325,7 @@ function HoverScrollText({ className, text }: { className?: string; text: string
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
 const UI_MODE_STORAGE_KEY = "bangumi-lens-ui-mode";
 const PROMPT_PRESET_STORAGE_KEY = "bangumi-lens-prompt-preset";
+const CUSTOM_PROMPT_STORAGE_KEY = "bangumi-lens-custom-prompt";
 const HOME_ROUTE = "/home";
 const REPORT_ROUTE_PREFIX = "/reports/";
 const SUMMARY_ROUTE_PREFIX = "/summary/";
@@ -1849,6 +1851,7 @@ async function analyzeEpisodeReport(
   trimmedUrl: string,
   options: {
     promptPresetId?: PromptPresetId;
+    customPrompt?: string;
     signal?: AbortSignal;
     onDelta?: (text: string) => void;
     onFinal?: (report: Report) => void;
@@ -1857,7 +1860,7 @@ async function analyzeEpisodeReport(
   const response = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: trimmedUrl, promptPresetId: options.promptPresetId }),
+    body: JSON.stringify({ url: trimmedUrl, promptPresetId: options.promptPresetId, customPrompt: options.customPrompt }),
     signal: options.signal
   });
 
@@ -1925,6 +1928,7 @@ export default function BangumiLensApp() {
   const [theme, setTheme] = useState<ThemeMode>("day");
   const [uiMode, setUiMode] = useState<UiMode>("classic");
   const [promptPresetId, setPromptPresetId] = useState<PromptPresetId>("default");
+  const [customPrompt, setCustomPrompt] = useState("");
   const [pendingDuplicate, setPendingDuplicate] = useState<SavedReport | null>(null);
   const [pendingAutoAnalyzeUrl, setPendingAutoAnalyzeUrl] = useState("");
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
@@ -2012,6 +2016,7 @@ export default function BangumiLensApp() {
     searchPagination && searchPagination.total > 0
       ? `${searchPagination.total} 个结果，第 ${searchPagination.page} 页`
       : `${searchResults.length} 个结果`;
+  const customPromptIsCustomized = customPrompt.trim().length > 0;
   const searchPage = searchPagination?.page ?? null;
   const searchPageCount = searchPagination ? Math.max(1, Math.ceil(searchPagination.total / searchPagination.pageSize)) : 1;
   const canGoPreviousSearchPage = Boolean(searchPagination && searchPagination.page > 1 && !searching);
@@ -2233,6 +2238,8 @@ export default function BangumiLensApp() {
       if (savedPromptPreset && isPromptPresetId(savedPromptPreset)) {
         setPromptPresetId(savedPromptPreset);
       }
+
+      setCustomPrompt(window.localStorage.getItem(CUSTOM_PROMPT_STORAGE_KEY) || "");
     } catch {
       document.documentElement.dataset.ui = "classic";
       // Preference loading is optional.
@@ -2437,6 +2444,19 @@ export default function BangumiLensApp() {
   function changePromptPreset(nextPresetId: PromptPresetId) {
     setPromptPresetId(nextPresetId);
     window.localStorage.setItem(PROMPT_PRESET_STORAGE_KEY, nextPresetId);
+  }
+
+  function changeCustomPrompt(nextCustomPrompt: string) {
+    setCustomPrompt(nextCustomPrompt);
+    if (nextCustomPrompt.trim()) {
+      window.localStorage.setItem(CUSTOM_PROMPT_STORAGE_KEY, nextCustomPrompt);
+    } else {
+      window.localStorage.removeItem(CUSTOM_PROMPT_STORAGE_KEY);
+    }
+  }
+
+  function restoreDefaultPrompt() {
+    changeCustomPrompt("");
   }
 
   function requestPromptPresetChange(nextPresetId: PromptPresetId) {
@@ -2851,6 +2871,7 @@ export default function BangumiLensApp() {
       try {
         const nextReport = await analyzeEpisodeReport(item.url, {
           promptPresetId,
+          customPrompt,
           signal: abortController.signal,
           onDelta: (text) => {
             setSeasonReportGeneration((current) =>
@@ -3175,6 +3196,7 @@ export default function BangumiLensApp() {
 
   const runAnalysis = useCallback(async (trimmedUrl: string, options: { promptPresetId?: PromptPresetId } = {}) => {
     const analysisPromptPresetId = options.promptPresetId ?? promptPresetId;
+    const analysisCustomPrompt = customPrompt;
     setError("");
     setReport(null);
     setStreamingText("");
@@ -3184,7 +3206,7 @@ export default function BangumiLensApp() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: trimmedUrl, promptPresetId: analysisPromptPresetId })
+        body: JSON.stringify({ url: trimmedUrl, promptPresetId: analysisPromptPresetId, customPrompt: analysisCustomPrompt })
       });
 
       if (!response.ok) {
@@ -3234,7 +3256,7 @@ export default function BangumiLensApp() {
     } finally {
       setLoading(false);
     }
-  }, [promptPresetId, saveReport]);
+  }, [customPrompt, promptPresetId, saveReport]);
 
   const startAnalysis = useCallback((trimmedUrl: string) => {
     const existingReport = findExistingReport(history, trimmedUrl);
@@ -3788,6 +3810,7 @@ export default function BangumiLensApp() {
       try {
         const nextReport = await analyzeEpisodeReport(item.url, {
           promptPresetId,
+          customPrompt,
           signal: abortController.signal,
           onDelta: (text) => {
             setSeasonReportGeneration((current) =>
@@ -4289,6 +4312,37 @@ export default function BangumiLensApp() {
               <em>{getPromptPreset(promptPresetId).description}</em>
             </span>
           </label>
+          <details className="custom-prompt-editor" open={customPromptIsCustomized}>
+            <summary>
+              <span>
+                <Edit3 size={15} />
+                自定义提示词
+              </span>
+              <em>{customPromptIsCustomized ? "已启用" : "使用默认"}</em>
+            </summary>
+            <div className="custom-prompt-body">
+              <textarea
+                value={customPrompt}
+                onChange={(event) => changeCustomPrompt(event.target.value)}
+                disabled={loading || searching}
+                rows={5}
+                maxLength={4000}
+                placeholder="可补充本次报告偏好，例如：更关注演出节奏；减少玩梗；productionNotes 只保留有明确来源的内容。"
+                aria-label="自定义提示词"
+              />
+              <div className="custom-prompt-footer">
+                <span>{customPrompt.trim().length}/4000</span>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={restoreDefaultPrompt}
+                  disabled={!customPromptIsCustomized || loading || searching}
+                >
+                  恢复默认
+                </button>
+              </div>
+            </div>
+          </details>
           <p className="hint">输入作品名会先搜索 Bangumi 条目；确认作品后再选择具体话数。已有本地报告会在选中章节后提示查看或重新生成。</p>
         </form>
       </section>

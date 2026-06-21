@@ -189,9 +189,15 @@ function requireModelApiKey() {
   return apiKey;
 }
 
-function createMessages(meta: EpisodeMeta, comments: WeightedComment[], webContext: WebSearchResult[] = [], presetId?: string) {
+function createMessages(
+  meta: EpisodeMeta,
+  comments: WeightedComment[],
+  webContext: WebSearchResult[] = [],
+  presetId?: string,
+  customPrompt?: string
+) {
   const digest = buildCommentDigest(comments);
-  const prompt = loadReportPrompt(responseJsonSchema(), presetId);
+  const prompt = loadReportPrompt(responseJsonSchema(), presetId, customPrompt);
 
   return [
     {
@@ -365,7 +371,8 @@ export async function createReportStream(
   meta: EpisodeMeta,
   comments: WeightedComment[],
   webContext: WebSearchResult[] = [],
-  presetId?: string
+  presetId?: string,
+  customPrompt?: string
 ) {
   configureServerProxy();
 
@@ -375,7 +382,7 @@ export async function createReportStream(
 
   return client.chat.completions.create({
     model,
-    messages: createMessages(meta, comments, webContext, presetId),
+    messages: createMessages(meta, comments, webContext, presetId, customPrompt),
     response_format: { type: "json_object" },
     stream: true,
     temperature: 0.2

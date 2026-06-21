@@ -193,6 +193,18 @@ test("report prompt presets inject style instructions and fall back to default",
   assert.equal(fallbackPreset.id, "default");
 });
 
+test("report prompt appends trimmed custom prompt without changing blank defaults", () => {
+  const { loadReportPrompt } = requireTypeScriptModule(join(process.cwd(), "lib", "report-prompt.ts"));
+
+  const defaultPrompt = loadReportPrompt("{}", "default");
+  const blankPrompt = loadReportPrompt("{}", "default", "   ");
+  const customPrompt = loadReportPrompt("{}", "default", "  更关注演出节奏，少写玩梗。  ");
+
+  assert.equal(blankPrompt.task, defaultPrompt.task);
+  assert.match(customPrompt.task, /用户自定义提示词/);
+  assert.match(customPrompt.task, /更关注演出节奏，少写玩梗。/);
+});
+
 test("parseReportOutput records the selected prompt preset", () => {
   const { parseReportOutput } = requireTypeScriptModule(join(process.cwd(), "lib", "report.ts"));
   const report = parseReportOutput(

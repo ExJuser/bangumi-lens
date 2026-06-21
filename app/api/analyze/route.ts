@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   await appendAppLog("info", "analyze.request.start");
 
   try {
-    const body = (await request.json()) as { url?: unknown; promptPresetId?: unknown };
+    const body = (await request.json()) as { url?: unknown; promptPresetId?: unknown; customPrompt?: unknown };
     if (typeof body.url !== "string") {
       await appendAppLog("warn", "analyze.request.invalid", { reason: "missing_url" });
       return NextResponse.json({ error: "请提供 Bangumi 章节链接。" }, { status: 400 });
@@ -23,15 +23,17 @@ export async function POST(request: Request) {
 
     const parsedUrl = parseBangumiEpisodeUrl(body.url);
     const promptPresetId = typeof body.promptPresetId === "string" ? body.promptPresetId : undefined;
+    const customPrompt = typeof body.customPrompt === "string" ? body.customPrompt : undefined;
     await appendAppLog("info", "analyze.request.accepted", {
       episodeId: parsedUrl.episodeId,
-      promptPresetId
+      promptPresetId,
+      hasCustomPrompt: Boolean(customPrompt?.trim())
     });
 
     const episode = await fetchBangumiEpisode(body.url);
     const weightedComments = weightComments(episode.comments);
     const webContext = await searchEpisodeWebContext(episode.meta);
-    const stream = await createReportStream(episode.meta, weightedComments, webContext, promptPresetId);
+    const stream = await createReportStream(episode.meta, weightedComments, webContext, promptPresetId, customPrompt);
 
     const encoder = new TextEncoder();
     let outputText = "";
