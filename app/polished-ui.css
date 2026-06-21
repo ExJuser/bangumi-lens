@@ -2876,6 +2876,91 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   font-size: 13px;
 }
 
+:root[data-ui="polished"] .source-evidence {
+  margin-top: 12px;
+}
+
+:root[data-ui="polished"] .source-evidence summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  list-style: none;
+  padding: 5px 9px;
+}
+
+:root[data-ui="polished"] .source-evidence summary::-webkit-details-marker {
+  display: none;
+}
+
+:root[data-ui="polished"] .source-evidence summary:hover {
+  background: var(--selected);
+}
+
+:root[data-ui="polished"] .source-evidence summary strong {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--selected);
+  color: var(--accent-dark);
+  font-size: 12px;
+}
+
+:root[data-ui="polished"] .source-evidence-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+:root[data-ui="polished"] .source-evidence-item {
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  padding: 9px 10px;
+}
+
+:root[data-ui="polished"] .source-evidence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+:root[data-ui="polished"] .source-evidence-head a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-dark);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+:root[data-ui="polished"] .source-evidence-head a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+:root[data-ui="polished"] .source-evidence-item p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.62;
+}
+
 :root[data-ui="polished"] .spoiler-card {
   margin-top: 18px;
   border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));

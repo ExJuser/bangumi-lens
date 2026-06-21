@@ -50,6 +50,7 @@ type ReportItem = {
   summary: string;
   quotes?: ReportQuote[] | string[];
   sourceCommentIds: string[];
+  sourceEvidence?: ReportSourceEvidence[];
 };
 
 type ReportQuote = {
@@ -59,6 +60,22 @@ type ReportQuote = {
     label: string;
     count: number;
   }[];
+  source?: ReportSourceEvidence;
+};
+
+type ReportSourceEvidence = {
+  id: string;
+  floor?: string;
+  author?: string;
+  text: string;
+  replyCount: number;
+  reactionCount: number;
+  likeCount: number;
+  reactions: {
+    label: string;
+    count: number;
+  }[];
+  commentUrl?: string;
 };
 
 type Report = {
@@ -630,6 +647,59 @@ function getCommentLink(episodeUrl: string, commentId?: string) {
   }
 }
 
+function formatEvidenceMeta(evidence: ReportSourceEvidence) {
+  return [
+    evidence.floor ? `#${evidence.floor}` : undefined,
+    evidence.author,
+    `${evidence.replyCount} 回复`,
+    `${evidence.reactionCount} 表情`,
+    `${evidence.likeCount} 赞`
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function SourceEvidenceList({ evidence }: { evidence?: ReportSourceEvidence[] }) {
+  if (!evidence || evidence.length === 0) return null;
+
+  return (
+    <details className="source-evidence">
+      <summary>
+        <span>查看依据</span>
+        <strong>{evidence.length}</strong>
+      </summary>
+      <div className="source-evidence-list">
+        {evidence.map((item) => (
+          <article className="source-evidence-item" key={item.id}>
+            <div className="source-evidence-head">
+              <span>{formatEvidenceMeta(item)}</span>
+              {item.commentUrl ? (
+                <a href={item.commentUrl} rel="noreferrer" target="_blank">
+                  <ExternalLink size={13} />
+                  原文
+                </a>
+              ) : null}
+            </div>
+            <p>
+              <RichText text={item.text} />
+            </p>
+            {item.reactions.length > 0 ? (
+              <span className="reaction-pills" aria-label="表情统计">
+                {item.reactions.slice(0, 6).map((reaction, reactionIndex) => (
+                  <span className="reaction-pill" key={`${reaction.label}-${reactionIndex}`}>
+                    {reaction.label}
+                    <strong>{reaction.count}</strong>
+                  </span>
+                ))}
+              </span>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function ReportList({ items, icon, episodeUrl }: { items: ReportItem[]; icon: React.ReactNode; episodeUrl: string }) {
   if (items.length === 0) {
     return <p className="muted">这部分没有足够明确的公开评论信号。</p>;
@@ -680,6 +750,7 @@ function ReportList({ items, icon, episodeUrl }: { items: ReportItem[]; icon: Re
                   })}
                 </div>
               ) : null}
+              <SourceEvidenceList evidence={item.sourceEvidence} />
             </div>
           </article>
       ))}

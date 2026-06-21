@@ -46,10 +46,12 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
   const comments = [
     {
       id: "post-1",
+      floor: "12",
+      author: "alice",
       text: "comment text",
-      replyCount: 0,
+      replyCount: 3,
       reactionCount: 2,
-      likeCount: 0,
+      likeCount: 5,
       reactions: [{ label: "like", count: 2 }],
       replies: [],
       weight: 1,
@@ -85,11 +87,35 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
   assert.equal(report.productionNotes.length, 0);
   assert.equal(Number.isFinite(new Date(report.generatedAt).getTime()), true);
   assert.deepEqual(report.discussionHotspots[0].quotes?.[0].reactions, [{ label: "like", count: 2 }]);
+  assert.deepEqual(report.discussionHotspots[0].quotes?.[0].source, {
+    id: "post-1",
+    floor: "12",
+    author: "alice",
+    text: "comment text",
+    replyCount: 3,
+    reactionCount: 2,
+    likeCount: 5,
+    reactions: [{ label: "like", count: 2 }],
+    commentUrl: "https://bgm.tv/ep/1#post_post-1"
+  });
+  assert.deepEqual(report.discussionHotspots[0].sourceEvidence, [
+    {
+      id: "post-1",
+      floor: "12",
+      author: "alice",
+      text: "comment text",
+      replyCount: 3,
+      reactionCount: 2,
+      likeCount: 5,
+      reactions: [{ label: "like", count: 2 }],
+      commentUrl: "https://bgm.tv/ep/1#post_post-1"
+    }
+  ]);
   assert.deepEqual(report.resonancePoints[0].quotes?.[0], { text: "legacy string quote" });
   assert.deepEqual(report.stats, {
     commentCount: 1,
-    replyCount: 0,
-    reactionCount: 2,
-    participantCount: 0
+    replyCount: 3,
+    reactionCount: 7,
+    participantCount: 1
   });
 });

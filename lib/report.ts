@@ -3,7 +3,7 @@ import { z } from "zod";
 import { loadReportPrompt } from "@/lib/report-prompt";
 import { configureServerProxy, createHttpsProxyAgent } from "@/lib/proxy";
 import { buildReportStats } from "@/lib/report-stats";
-import type { AnalyzeReport, EpisodeMeta, ReportItem, WeightedComment } from "@/lib/types";
+import type { AnalyzeReport, EpisodeMeta, ReportItem, ReportSourceEvidence, WeightedComment } from "@/lib/types";
 import type { SeasonTrendPayload } from "@/lib/season-trends";
 import type { WebSearchResult } from "@/lib/web-search";
 import { buildCommentDigest } from "@/lib/weights";
@@ -75,7 +75,33 @@ function responseJsonSchema() {
   });
 }
 
-function enrichReportItemsWithReactions(items: ReportItem[], comments: WeightedComment[]) {
+function buildCommentUrl(episodeUrl: string, commentId: string) {
+  if (/^comment-\d+$/i.test(commentId)) return undefined;
+
+  try {
+    const url = new URL(episodeUrl);
+    url.hash = commentId.startsWith("post_") ? commentId : `post_${commentId}`;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function createSourceEvidence(comment: WeightedComment, episodeUrl: string): ReportSourceEvidence {
+  return {
+    id: comment.id,
+    floor: comment.floor,
+    author: comment.author,
+    text: comment.text.slice(0, 420),
+    replyCount: comment.replyCount,
+    reactionCount: comment.reactionCount,
+    likeCount: comment.likeCount,
+    reactions: comment.reactions,
+    commentUrl: buildCommentUrl(episodeUrl, comment.id)
+  };
+}
+
+function enrichReportItemsWithEvidence(items: ReportItem[], comments: WeightedComment[], meta: EpisodeMeta) {
   const commentsById = new Map(comments.map((comment) => [comment.id, comment]));
 
   return items.map((item) => ({
@@ -83,13 +109,19 @@ function enrichReportItemsWithReactions(items: ReportItem[], comments: WeightedC
     quotes: item.quotes?.map((quote) => {
       if (!quote.sourceCommentId) return quote;
       const sourceComment = commentsById.get(quote.sourceCommentId);
-      if (!sourceComment || sourceComment.reactions.length === 0) return quote;
+      if (!sourceComment) return quote;
 
       return {
         ...quote,
-        reactions: sourceComment.reactions
+        reactions: sourceComment.reactions,
+        source: createSourceEvidence(sourceComment, meta.url)
       };
-    })
+    }),
+    sourceEvidence: [...new Set([...(item.sourceCommentIds || []), ...(item.quotes || []).map((quote) => quote.sourceCommentId)])]
+      .map((commentId) => (commentId ? commentsById.get(commentId) : undefined))
+      .filter((comment): comment is WeightedComment => Boolean(comment))
+      .slice(0, 6)
+      .map((comment) => createSourceEvidence(comment, meta.url))
   }));
 }
 
@@ -280,10 +312,10 @@ export function parseReportOutput(outputText: string, meta: EpisodeMeta, comment
 
   return {
     ...parsed,
-    episodeDetails: enrichReportItemsWithReactions(parsed.episodeDetails, comments),
-    productionNotes: enrichReportItemsWithReactions(parsed.productionNotes, comments),
-    discussionHotspots: enrichReportItemsWithReactions(parsed.discussionHotspots, comments),
-    resonancePoints: enrichReportItemsWithReactions(parsed.resonancePoints, comments),
+    episodeDetails: enrichReportItemsWithEvidence(parsed.episodeDetails, comments, meta),
+    productionNotes: enrichReportItemsWithEvidence(parsed.productionNotes, comments, meta),
+    discussionHotspots: enrichReportItemsWithEvidence(parsed.discussionHotspots, comments, meta),
+    resonancePoints: enrichReportItemsWithEvidence(parsed.resonancePoints, comments, meta),
     generatedAt: new Date().toISOString(),
     meta,
     stats: buildReportStats(comments)

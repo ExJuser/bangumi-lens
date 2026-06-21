@@ -2973,6 +2973,87 @@ input {
   font-size: 13px;
 }
 
+.source-evidence {
+  margin-top: 12px;
+}
+
+.source-evidence summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel) 72%, var(--field));
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  list-style: none;
+  padding: 5px 9px;
+}
+
+.source-evidence summary::-webkit-details-marker {
+  display: none;
+}
+
+.source-evidence summary strong {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--field));
+  color: var(--accent-dark);
+  font-size: 12px;
+}
+
+.source-evidence-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.source-evidence-item {
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel) 58%, var(--field));
+  padding: 9px 10px;
+}
+
+.source-evidence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.source-evidence-head a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-dark);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.source-evidence-head a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.source-evidence-item p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.62;
+}
+
 .spoiler-card {
   margin-top: 18px;
   border: 1px solid rgba(47, 125, 104, 0.22);

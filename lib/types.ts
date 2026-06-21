@@ -82,12 +82,26 @@ export type ReportItem = {
   summary: string;
   quotes?: ReportQuote[];
   sourceCommentIds: string[];
+  sourceEvidence?: ReportSourceEvidence[];
 };
 
 export type ReportQuote = {
   text: string;
   sourceCommentId?: string;
   reactions?: BangumiReaction[];
+  source?: ReportSourceEvidence;
+};
+
+export type ReportSourceEvidence = {
+  id: string;
+  floor?: string;
+  author?: string;
+  text: string;
+  replyCount: number;
+  reactionCount: number;
+  likeCount: number;
+  reactions: BangumiReaction[];
+  commentUrl?: string;
 };
 
 export type AnalyzeReport = {
