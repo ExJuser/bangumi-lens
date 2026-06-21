@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchBangumiSubjectInfo } from "@/lib/bangumi";
 import { readHistory } from "@/lib/history-store";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { buildSeasonTrendPayload } from "@/lib/season-trends";
@@ -18,8 +19,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    const history = await readHistory();
-    const trends = buildSeasonTrendPayload(history, subjectId, subjectName);
+    const [history, subjectInfo] = await Promise.all([
+      readHistory(),
+      subjectId ? fetchBangumiSubjectInfo(subjectId) : Promise.resolve({})
+    ]);
+    const trends = buildSeasonTrendPayload(history, subjectId, subjectName, {
+      episodeTotal: subjectInfo.episodeTotal
+    });
     await appendAppLog("info", "season_trends.request.complete", {
       subjectId,
       subjectName,

@@ -110,7 +110,7 @@ export async function fetchBangumiSubjectInfo(
       rating?: unknown;
     };
     const titleCn = typeof subject.name_cn === "string" && subject.name_cn.trim() ? subject.name_cn.trim() : undefined;
-    const rawEpisodeTotal = Number(subject.total_episodes || subject.eps);
+    const rawEpisodeTotal = Number(subject.eps || subject.total_episodes);
     const episodeTotal = Number.isFinite(rawEpisodeTotal) && rawEpisodeTotal > 0 ? rawEpisodeTotal : undefined;
     const subjectRating = summarizeSubjectRating(subject.rating);
     const subjectInfo: SubjectInfo = { titleCn, episodeTotal, subjectRating };

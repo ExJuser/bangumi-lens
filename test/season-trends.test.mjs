@@ -115,6 +115,24 @@ test("season trend threshold is half of known episode total", () => {
   assert.equal(buildSeasonTrendPayload(sixReports, "subject-1").available, true);
 });
 
+test("season trends can infer final main episode from saved navigation metadata", () => {
+  const { buildSeasonTrendPayload } = requireTypeScriptModule(join(process.cwd(), "lib", "season-trends.ts"));
+  const reports = Array.from({ length: 12 }, (_, index) =>
+    makeReport(index + 1, {
+      episodeTotal: 14,
+      nextEpisodeId: index === 11 ? null : String(index + 2)
+    })
+  );
+  reports.forEach((item, index) => {
+    item.report.meta.nextEpisodeId = index === 11 ? null : String(index + 2);
+  });
+
+  const payload = buildSeasonTrendPayload(reports, "subject-1");
+
+  assert.equal(payload.episodeTotal, 12);
+  assert.equal(payload.requiredReportCount, 6);
+});
+
 test("odd episode totals round the threshold up", () => {
   const { buildSeasonTrendPayload } = requireTypeScriptModule(join(process.cwd(), "lib", "season-trends.ts"));
   const sixReports = Array.from({ length: 6 }, (_, index) => makeReport(index + 1, { episodeTotal: 13 }));

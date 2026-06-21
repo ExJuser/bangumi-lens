@@ -99,7 +99,8 @@ test("fetchBangumiSubjectInfo excludes normal-list extras past the official epis
       return new Response(
         JSON.stringify({
           name_cn: "只有我不存在的城市",
-          total_episodes: 12,
+          eps: 12,
+          total_episodes: 14,
           rating: { score: 8, total: 1, count: { 8: 1 } }
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }

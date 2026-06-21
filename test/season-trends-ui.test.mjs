@@ -68,7 +68,7 @@ test("episode navigation treats official episode total as the final main episode
     source.indexOf("function getReportRoute")
   );
 
-  assert.match(boundaryBody, /const episodeTotal = report\.meta\.episodeTotal \|\| knownEpisodeTotal/);
+  assert.match(boundaryBody, /const episodeTotal = knownEpisodeTotal \?\? report\.meta\.episodeTotal/);
   assert.match(boundaryBody, /direction === "next"/);
   assert.match(boundaryBody, /episodeSort >= episodeTotal/);
 });

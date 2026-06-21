@@ -105,7 +105,7 @@ async function buildSearchResults(query: string) {
       const episode = await fetchFirstEpisode(subject.id);
       if (!episode?.id) return undefined;
 
-      const episodeTotal = Number(subject.total_episodes || subject.eps);
+      const episodeTotal = Number(subject.eps || subject.total_episodes);
       const result: SearchResult = {
         subjectId: String(subject.id),
         title: subject.name?.trim() || getSubjectTitle(subject),

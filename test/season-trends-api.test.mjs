@@ -11,7 +11,9 @@ test("season trends API exposes threshold payload and validates subject id", () 
   assert.match(source, /searchParams\.get\("subjectId"\)/);
   assert.match(source, /searchParams\.get\("subjectName"\)/);
   assert.match(source, /return NextResponse\.json\(\{ error: "缺少作品 ID 或作品名。"\s*\}, \{ status: 400 \}\)/);
-  assert.match(source, /buildSeasonTrendPayload\(history,\s*subjectId,\s*subjectName\)/);
+  assert.match(source, /fetchBangumiSubjectInfo\(subjectId\)/);
+  assert.match(source, /buildSeasonTrendPayload\(history,\s*subjectId,\s*subjectName,\s*\{/);
+  assert.match(source, /episodeTotal: subjectInfo\.episodeTotal/);
   assert.match(source, /return NextResponse\.json\(\{ trends \}\)/);
 });
 
@@ -38,5 +40,7 @@ test("subject info API refreshes old cache entries without episode lists", () =>
 
   assert.match(source, /function hasEpisodeList/);
   assert.match(source, /Array\.isArray\(subjectInfo\?\.episodes\)/);
-  assert.match(source, /if \(cached && hasEpisodeList\(cached\)\)/);
+  assert.match(source, /SUBJECT_INFO_CACHE_SCHEMA_VERSION = 2/);
+  assert.match(source, /hasCurrentCacheSchema\(cached\)/);
+  assert.match(source, /cacheSchemaVersion: SUBJECT_INFO_CACHE_SCHEMA_VERSION/);
 });

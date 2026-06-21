@@ -1341,7 +1341,7 @@ function getMissingEpisodePrimaryActionLabel(prompt: MissingEpisodePrompt) {
 }
 
 function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
-  const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
+  const episodeTotal = knownEpisodeTotal ?? report.meta.episodeTotal;
   const episodeSort = report.meta.episodeSort ?? report.meta.episodeNumber;
 
   if (
@@ -1410,7 +1410,7 @@ function isEpisodeUnavailable(report: Report, direction: EpisodeDirection, known
   if (direction !== "next") return false;
   if (report.meta.nextEpisodeId !== null) return false;
 
-  const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
+  const episodeTotal = knownEpisodeTotal ?? report.meta.episodeTotal;
   const episodeSort = report.meta.episodeSort ?? report.meta.episodeNumber;
   return typeof episodeTotal === "number" && episodeTotal > 0 && typeof episodeSort === "number" && episodeSort < episodeTotal;
 }

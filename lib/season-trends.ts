@@ -201,10 +201,37 @@ function findSubjectReports(reports: AnalyzeReport[], subjectId?: string, subjec
   return reports.filter((report) => normalizeSubjectName(report) === normalizedSubjectName);
 }
 
+function getFinalKnownEpisodeSort(reports: AnalyzeReport[]) {
+  const finalSorts = reports
+    .map((report) => {
+      if (report.meta.nextEpisodeId !== null) return undefined;
+      return report.meta.episodeSort ?? report.meta.episodeNumber;
+    })
+    .filter((episodeSort): episodeSort is number => typeof episodeSort === "number" && episodeSort > 0);
+  if (finalSorts.length === 0) return undefined;
+  return Math.max(...finalSorts);
+}
+
+function resolveEpisodeTotal(reports: AnalyzeReport[], overrideEpisodeTotal?: number) {
+  if (typeof overrideEpisodeTotal === "number" && overrideEpisodeTotal > 0) return overrideEpisodeTotal;
+
+  const reportedEpisodeTotal = reports.find((report) => typeof report.meta.episodeTotal === "number")?.meta.episodeTotal;
+  const finalKnownEpisodeSort = getFinalKnownEpisodeSort(reports);
+  if (
+    typeof finalKnownEpisodeSort === "number" &&
+    (typeof reportedEpisodeTotal !== "number" || reportedEpisodeTotal > finalKnownEpisodeSort)
+  ) {
+    return finalKnownEpisodeSort;
+  }
+
+  return reportedEpisodeTotal;
+}
+
 export function buildSeasonTrendPayload(
   savedReports: SavedReportLike[],
   subjectId?: string,
-  subjectName?: string
+  subjectName?: string,
+  options: { episodeTotal?: number } = {}
 ): SeasonTrendPayload {
   const reports = findSubjectReports(
     savedReports.map((item) => item.report).filter(Boolean),
@@ -217,7 +244,7 @@ export function buildSeasonTrendPayload(
   });
 
   const resolvedSubjectName = reports[0] ? normalizeSubjectName(reports[0]) : subjectName?.trim() || "未分类作品";
-  const episodeTotal = reports.find((report) => typeof report.meta.episodeTotal === "number")?.meta.episodeTotal;
+  const episodeTotal = resolveEpisodeTotal(reports, options.episodeTotal);
   const requiredReportCount = getRequiredReportCount(episodeTotal);
   const episodes = reports.map((report) => {
     const participantCount = report.stats.participantCount ?? report.stats.commentCount;
