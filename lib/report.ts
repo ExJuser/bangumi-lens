@@ -3,7 +3,7 @@ import { z } from "zod";
 import { loadReportPrompt, resolveReportPromptPreset } from "@/lib/report-prompt";
 import { configureServerProxy, createHttpsProxyAgent } from "@/lib/proxy";
 import { buildReportStats } from "@/lib/report-stats";
-import type { AnalyzeReport, EpisodeMeta, ReportItem, ReportSourceEvidence, WeightedComment } from "@/lib/types";
+import type { AnalyzeReport, EpisodeMeta, ReportItem, ReportSourceEvidence, StanceDistributionItem, WeightedComment } from "@/lib/types";
 import type { SeasonTrendPayload } from "@/lib/season-trends";
 import type { WebSearchResult } from "@/lib/web-search";
 import { buildCommentDigest } from "@/lib/weights";
@@ -25,6 +25,13 @@ const reportItemSchema = z.object({
   sourceCommentIds: z.array(z.string())
 });
 
+const stanceDistributionSchema = z.object({
+  label: z.enum(["好评", "失望", "争议", "中立", "玩梗", "制作讨论", "原作对比"]),
+  percentage: z.coerce.number().min(0).max(100),
+  summary: z.string(),
+  sourceCommentIds: z.array(z.string()).default([])
+});
+
 const reportSchema = z.object({
   episodeSummary: z.string(),
   opinionSummary: z.string(),
@@ -32,6 +39,7 @@ const reportSchema = z.object({
   productionNotes: z.array(reportItemSchema).default([]),
   discussionHotspots: z.array(reportItemSchema).default([]),
   resonancePoints: z.array(reportItemSchema).default([]),
+  stanceDistribution: z.array(stanceDistributionSchema).default([]),
   spoilerNotes: z.array(z.string()).default([])
 });
 
@@ -68,6 +76,14 @@ function responseJsonSchema() {
         title: "string",
         summary: "string",
         quotes: [{ text: "short original comment quote", sourceCommentId: "comment-id" }],
+        sourceCommentIds: ["comment-id"]
+      }
+    ],
+    stanceDistribution: [
+      {
+        label: "好评 | 失望 | 争议 | 中立 | 玩梗 | 制作讨论 | 原作对比",
+        percentage: 0,
+        summary: "string",
         sourceCommentIds: ["comment-id"]
       }
     ],
@@ -121,6 +137,23 @@ function enrichReportItemsWithEvidence(items: ReportItem[], comments: WeightedCo
       .map((commentId) => (commentId ? commentsById.get(commentId) : undefined))
       .filter((comment): comment is WeightedComment => Boolean(comment))
       .slice(0, 6)
+      .map((comment) => createSourceEvidence(comment, meta.url))
+  }));
+}
+
+function enrichStanceDistributionWithEvidence(
+  items: StanceDistributionItem[],
+  comments: WeightedComment[],
+  meta: EpisodeMeta
+) {
+  const commentsById = new Map(comments.map((comment) => [comment.id, comment]));
+
+  return items.map((item) => ({
+    ...item,
+    sourceEvidence: [...new Set(item.sourceCommentIds || [])]
+      .map((commentId) => commentsById.get(commentId))
+      .filter((comment): comment is WeightedComment => Boolean(comment))
+      .slice(0, 4)
       .map((comment) => createSourceEvidence(comment, meta.url))
   }));
 }
@@ -317,6 +350,7 @@ export function parseReportOutput(outputText: string, meta: EpisodeMeta, comment
     productionNotes: enrichReportItemsWithEvidence(parsed.productionNotes, comments, meta),
     discussionHotspots: enrichReportItemsWithEvidence(parsed.discussionHotspots, comments, meta),
     resonancePoints: enrichReportItemsWithEvidence(parsed.resonancePoints, comments, meta),
+    stanceDistribution: enrichStanceDistributionWithEvidence(parsed.stanceDistribution, comments, meta),
     generatedAt: new Date().toISOString(),
     promptPreset: {
       id: preset.id,

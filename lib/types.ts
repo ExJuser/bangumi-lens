@@ -111,6 +111,7 @@ export type AnalyzeReport = {
   productionNotes: ReportItem[];
   discussionHotspots: ReportItem[];
   resonancePoints: ReportItem[];
+  stanceDistribution?: StanceDistributionItem[];
   spoilerNotes: string[];
   generatedAt: string;
   promptPreset?: {
@@ -124,4 +125,12 @@ export type AnalyzeReport = {
     reactionCount: number;
     participantCount: number;
   };
+};
+
+export type StanceDistributionItem = {
+  label: "好评" | "失望" | "争议" | "中立" | "玩梗" | "制作讨论" | "原作对比";
+  percentage: number;
+  summary: string;
+  sourceCommentIds: string[];
+  sourceEvidence?: ReportSourceEvidence[];
 };

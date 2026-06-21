@@ -3209,6 +3209,57 @@ input {
   line-height: 1.62;
 }
 
+.stance-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stance-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 12px;
+}
+
+.stance-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.stance-head strong {
+  font-size: 16px;
+}
+
+.stance-head span {
+  color: var(--accent-dark);
+  font-weight: 850;
+}
+
+.stance-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 68%, transparent);
+}
+
+.stance-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--blue));
+}
+
+.stance-item p {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
 .spoiler-card {
   margin-top: 18px;
   border: 1px solid rgba(47, 125, 104, 0.22);

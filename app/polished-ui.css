@@ -3114,6 +3114,57 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   line-height: 1.62;
 }
 
+:root[data-ui="polished"] .stance-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+:root[data-ui="polished"] .stance-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  padding: 12px;
+}
+
+:root[data-ui="polished"] .stance-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+:root[data-ui="polished"] .stance-head strong {
+  font-size: 16px;
+}
+
+:root[data-ui="polished"] .stance-head span {
+  color: var(--accent-dark);
+  font-weight: 850;
+}
+
+:root[data-ui="polished"] .stance-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 68%, transparent);
+}
+
+:root[data-ui="polished"] .stance-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--blue));
+}
+
+:root[data-ui="polished"] .stance-item p {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
 :root[data-ui="polished"] .spoiler-card {
   margin-top: 18px;
   border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));

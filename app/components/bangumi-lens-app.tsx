@@ -86,6 +86,7 @@ type Report = {
   productionNotes?: ReportItem[];
   discussionHotspots: ReportItem[];
   resonancePoints: ReportItem[];
+  stanceDistribution?: StanceDistributionItem[];
   spoilerNotes: string[];
   generatedAt?: string;
   promptPreset?: {
@@ -193,6 +194,14 @@ type SeasonTrendPayload = {
   resonancePoints: SeasonTrendPoint[];
   controversyPoints: SeasonTrendPoint[];
   localSummary: string;
+};
+
+type StanceDistributionItem = {
+  label: "好评" | "失望" | "争议" | "中立" | "玩梗" | "制作讨论" | "原作对比";
+  percentage: number;
+  summary: string;
+  sourceCommentIds: string[];
+  sourceEvidence?: ReportSourceEvidence[];
 };
 
 type HealthStatus = {
@@ -929,6 +938,43 @@ function ReportSection({
         <h2>{title}</h2>
       </div>
       <ReportList items={items || []} icon={icon} episodeUrl={episodeUrl} />
+    </article>
+  );
+}
+
+function StanceDistributionPanel({ items }: { items?: StanceDistributionItem[] }) {
+  const visibleItems = (items || []).filter((item) => item.summary || item.percentage > 0);
+
+  return (
+    <article className="panel stance-panel">
+      <div className="panel-title">
+        <BarChart3 size={18} />
+        <h2>评论立场分布</h2>
+      </div>
+      {visibleItems.length > 0 ? (
+        <div className="stance-list">
+          {visibleItems.map((item) => {
+            const percentage = Math.max(0, Math.min(100, item.percentage));
+            return (
+              <section className="stance-item" key={item.label}>
+                <div className="stance-head">
+                  <strong>{item.label}</strong>
+                  <span>{Math.round(percentage)}%</span>
+                </div>
+                <div className="stance-track" aria-label={`${item.label} ${Math.round(percentage)}%`}>
+                  <i style={{ width: `${percentage}%` }} />
+                </div>
+                <p>
+                  <RichText text={item.summary} />
+                </p>
+                <SourceEvidenceList evidence={item.sourceEvidence} />
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="muted">当前评论样本不足，暂时没有可靠的立场分布。</p>
+      )}
     </article>
   );
 }
@@ -4371,6 +4417,8 @@ export default function BangumiLensApp() {
                 <RichText text={report.opinionSummary} />
               </p>
             </article>
+
+            <StanceDistributionPanel items={report.stanceDistribution} />
 
             <ReportSection
               title="讨论热点"

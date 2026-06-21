@@ -115,12 +115,68 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
     }
   ]);
   assert.deepEqual(report.resonancePoints[0].quotes?.[0], { text: "legacy string quote" });
+  assert.deepEqual(report.stanceDistribution, []);
   assert.deepEqual(report.stats, {
     commentCount: 1,
     replyCount: 3,
     reactionCount: 7,
     participantCount: 1
   });
+});
+
+test("parseReportOutput validates stance distribution and enriches evidence", () => {
+  const { parseReportOutput } = requireTypeScriptModule(join(process.cwd(), "lib", "report.ts"));
+  const report = parseReportOutput(
+    JSON.stringify({
+      episodeSummary: "summary",
+      opinionSummary: "opinion",
+      discussionHotspots: [],
+      resonancePoints: [],
+      stanceDistribution: [
+        {
+          label: "好评",
+          percentage: "42",
+          summary: "观众认可本集演出。",
+          sourceCommentIds: ["post-stance"]
+        }
+      ]
+    }),
+    {
+      url: "https://bgm.tv/ep/3",
+      episodeId: "3",
+      title: "Episode 3"
+    },
+    [
+      {
+        id: "post-stance",
+        floor: "8",
+        author: "bob",
+        text: "演出很好",
+        replyCount: 1,
+        reactionCount: 3,
+        likeCount: 2,
+        reactions: [{ label: "赞", count: 3 }],
+        replies: [],
+        weight: 1,
+        signals: { discussion: 1, resonance: 1, information: 0 }
+      }
+    ]
+  );
+
+  assert.equal(report.stanceDistribution?.[0].percentage, 42);
+  assert.deepEqual(report.stanceDistribution?.[0].sourceEvidence, [
+    {
+      id: "post-stance",
+      floor: "8",
+      author: "bob",
+      text: "演出很好",
+      replyCount: 1,
+      reactionCount: 3,
+      likeCount: 2,
+      reactions: [{ label: "赞", count: 3 }],
+      commentUrl: "https://bgm.tv/ep/3#post_post-stance"
+    }
+  ]);
 });
 
 test("report prompt presets inject style instructions and fall back to default", () => {
