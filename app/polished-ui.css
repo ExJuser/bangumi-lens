@@ -1392,6 +1392,40 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   white-space: nowrap;
 }
 
+:root[data-ui="polished"] .search-selection-column-status {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+:root[data-ui="polished"] .bangumi-subject-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 9px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+:root[data-ui="polished"] .bangumi-subject-link:hover,
+:root[data-ui="polished"] .bangumi-subject-link:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--selected);
+  color: var(--accent-dark);
+}
+
 :root[data-ui="polished"] .search-pagination, :root[data-ui="polished"] .episode-pagination {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

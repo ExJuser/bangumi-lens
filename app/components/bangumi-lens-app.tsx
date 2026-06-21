@@ -402,6 +402,10 @@ function buildSearchEpisodeUrl(episodeId: string) {
   return `https://bgm.tv/ep/${episodeId}`;
 }
 
+function buildBangumiSubjectUrl(subjectId: string) {
+  return `https://bgm.tv/subject/${subjectId}`;
+}
+
 function getEpisodeSortLabel(sort?: number, fallbackId?: string) {
   if (typeof sort === "number") return `第 ${formatEpisodeNumber(sort)} 话`;
   return fallbackId ? `ep.${fallbackId}` : "未知话数";
@@ -3953,11 +3957,25 @@ export default function BangumiLensApp() {
               <section className="search-selection-column" aria-label="章节选择">
                 <div className="search-selection-column-head">
                   <strong>章节</strong>
-                  <span>
-                    {selectedSearchResult
-                      ? `${filteredSearchEpisodes.length} / ${searchEpisodes.length} 话，已选 ${selectedSearchEpisodes.length} 话`
-                      : "先选择作品"}
-                  </span>
+                  <div className="search-selection-column-status">
+                    {selectedSearchResult ? (
+                      <>
+                        <a
+                          className="bangumi-subject-link"
+                          href={buildBangumiSubjectUrl(selectedSearchResult.subjectId)}
+                          rel="noreferrer"
+                          target="_blank"
+                          title="打开 Bangumi 条目页"
+                        >
+                          <ExternalLink size={13} />
+                          Bangumi
+                        </a>
+                        <span>{`${filteredSearchEpisodes.length} / ${searchEpisodes.length} 话，已选 ${selectedSearchEpisodes.length} 话`}</span>
+                      </>
+                    ) : (
+                      <span>先选择作品</span>
+                    )}
+                  </div>
                 </div>
                 {selectedSearchResult ? (
                   <div className="episode-choice-panel" aria-label="章节选择">

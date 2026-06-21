@@ -1430,6 +1430,40 @@ input {
   white-space: nowrap;
 }
 
+.search-selection-column-status {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.bangumi-subject-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 9px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bangumi-subject-link:hover,
+.bangumi-subject-link:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--selected);
+  color: var(--accent-dark);
+}
+
 .search-pagination,
 .episode-pagination {
   display: grid;

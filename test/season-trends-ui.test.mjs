@@ -209,6 +209,21 @@ test("search selection dialog shows and resubmits the current keyword", () => {
   assert.match(css, /\.search-keyword-control button\s*\{[\s\S]*?font-size:\s*15px;/);
 });
 
+test("search selection dialog links back to the selected Bangumi subject", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(source, /function buildBangumiSubjectUrl\(subjectId: string\) \{\s*return `https:\/\/bgm\.tv\/subject\/\$\{subjectId\}`;/);
+  assert.match(source, /className="bangumi-subject-link"/);
+  assert.match(source, /href=\{buildBangumiSubjectUrl\(selectedSearchResult\.subjectId\)\}/);
+  assert.match(source, /target="_blank"/);
+  assert.match(source, /rel="noreferrer"/);
+  assert.match(source, /<ExternalLink size=\{13\} \/>/);
+  assert.match(source, />\s*Bangumi\s*</);
+  assert.match(css, /\.search-selection-column-status\s*\{/);
+  assert.match(css, /\.bangumi-subject-link\s*\{[\s\S]*?text-decoration:\s*none;/);
+});
+
 test("episode picker paginates large episode lists and selects only the current page", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
