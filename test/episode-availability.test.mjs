@@ -78,6 +78,18 @@ test("zero comments alone does not mark an old episode as not yet aired", () => 
     getEpisodeAvailabilityWarning(
       {
         id: "3",
+        airdate: null,
+        commentCount: 0
+      },
+      new Date(2026, 5, 20, 12)
+    ),
+    undefined
+  );
+
+  assert.equal(
+    getEpisodeAvailabilityWarning(
+      {
+        id: "3",
         commentCount: 0
       },
       new Date(2026, 5, 20, 12)

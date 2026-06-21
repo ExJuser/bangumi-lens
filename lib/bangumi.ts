@@ -221,6 +221,12 @@ function normalizeOptionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function normalizeOptionalAirdate(value: unknown) {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized || normalized === "0000-00-00") return null;
+  return normalized;
+}
+
 function normalizeOptionalNumber(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number : undefined;
@@ -236,7 +242,7 @@ function normalizeEpisodeApiItem(episode: BangumiEpisodeApiItem): EpisodeAvailab
     sort,
     title: normalizeOptionalString(episode.name),
     titleCn: normalizeOptionalString(episode.name_cn),
-    airdate: normalizeOptionalString(episode.airdate),
+    airdate: normalizeOptionalAirdate(episode.airdate),
     duration: normalizeOptionalString(episode.duration),
     commentCount: normalizeOptionalNumber(episode.comment)
   };

@@ -2,7 +2,7 @@ import type { EpisodeAvailabilitySignals } from "@/lib/types";
 
 export type EpisodeAvailabilityWarning = {
   certainty: "confirmed" | "possible";
-  airdate?: string;
+  airdate?: string | null;
   commentCount?: number;
 };
 
@@ -13,7 +13,7 @@ function getLocalDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function normalizeAirdate(airdate?: string) {
+function normalizeAirdate(airdate?: string | null) {
   const normalized = airdate?.trim();
   if (!normalized || normalized === "0000-00-00") return undefined;
 

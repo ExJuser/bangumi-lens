@@ -24,7 +24,7 @@ export type EpisodeAvailabilitySignals = {
   sort?: number;
   title?: string;
   titleCn?: string;
-  airdate?: string;
+  airdate?: string | null;
   duration?: string;
   commentCount?: number;
 };

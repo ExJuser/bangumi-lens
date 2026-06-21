@@ -135,3 +135,44 @@ test("fetchBangumiSubjectInfo excludes normal-list extras past the official epis
     globalThis.fetch = originalFetch;
   }
 });
+
+test("fetchBangumiSubjectInfo normalizes missing episode airdates to null", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const href = String(url);
+    if (href.includes("/v0/subjects/")) {
+      return new Response(
+        JSON.stringify({
+          name_cn: "Airdate Test",
+          eps: 3,
+          rating: { score: 8, total: 1, count: { 8: 1 } }
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        total: 3,
+        data: [
+          { id: 1, sort: 1, name_cn: "Episode 1", airdate: "2026-01-01", type: 0 },
+          { id: 2, sort: 2, name_cn: "Episode 2", airdate: "", type: 0 },
+          { id: 3, sort: 3, name_cn: "Episode 3", airdate: "0000-00-00", type: 0 }
+        ]
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+
+  try {
+    const { fetchBangumiSubjectInfo } = requireTypeScriptModule(join(process.cwd(), "lib", "bangumi.ts"));
+    const subjectInfo = await fetchBangumiSubjectInfo("123", { includeEpisodes: true });
+
+    assert.deepEqual(
+      subjectInfo.episodes.map((episode) => episode.airdate),
+      ["2026-01-01", null, null]
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

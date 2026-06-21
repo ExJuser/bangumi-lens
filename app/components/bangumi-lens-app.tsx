@@ -399,6 +399,10 @@ function getEpisodeChoiceLabel(episode: EpisodeAvailabilitySignals) {
   return title ? `${episodeNumber} ${title}` : episodeNumber;
 }
 
+function getEpisodeAirdateLabel(episode: EpisodeAvailabilitySignals) {
+  return episode.airdate || "日期未定";
+}
+
 export function matchesSearchEpisodeQuery(episode: EpisodeAvailabilitySignals, query: string) {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return true;
@@ -3778,7 +3782,7 @@ export default function BangumiLensApp() {
                                   </label>
                                   <span className="episode-choice-meta">
                                     <strong>{saved ? "已有报告" : "未生成"}</strong>
-                                    {episode.airdate ? <em>{episode.airdate}</em> : null}
+                                    <em>{getEpisodeAirdateLabel(episode)}</em>
                                   </span>
                                 </div>
                               );
