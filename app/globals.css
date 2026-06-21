@@ -1219,6 +1219,7 @@ input {
 }
 
 .episode-choice-footer span {
+  margin-right: auto;
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
@@ -1232,6 +1233,12 @@ input {
   min-height: 36px;
   padding: 0 12px;
   white-space: nowrap;
+}
+
+.episode-choice-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .search-selection-modal {
@@ -1262,12 +1269,26 @@ input {
   line-height: 1.15;
 }
 
+.search-selection-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .search-selection-head button {
   min-height: 38px;
   border-radius: 8px;
   padding: 0 14px;
   cursor: pointer;
   font-weight: 850;
+}
+
+.search-selection-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .search-selection-grid {

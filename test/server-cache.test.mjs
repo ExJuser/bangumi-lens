@@ -52,3 +52,41 @@ test("server cache can be cleared after writing entries", async () => {
     assert.equal(await readServerCache("search", "test", 60_000), undefined);
   });
 });
+
+test("server cache can delete one namespace key without touching others", async () => {
+  await withTempCwd(async () => {
+    const { deleteServerCache, readServerCache, writeServerCache } = loadServerCache();
+
+    await writeServerCache("bangumi-search-v2", "oni::page=1::size=8", { kind: "subject-search" });
+    await writeServerCache("bangumi-search-v2", "oni::page=2::size=8", { kind: "other-search-page" });
+    await writeServerCache("bangumi-subject-info", "12345", { kind: "episode-list" });
+
+    await deleteServerCache("bangumi-search-v2", "oni::page=1::size=8");
+
+    assert.equal(await readServerCache("bangumi-search-v2", "oni::page=1::size=8", 60_000), undefined);
+    assert.deepEqual(await readServerCache("bangumi-search-v2", "oni::page=2::size=8", 60_000), {
+      kind: "other-search-page"
+    });
+    assert.deepEqual(await readServerCache("bangumi-subject-info", "12345", 60_000), {
+      kind: "episode-list"
+    });
+  });
+});
+
+test("server cache can delete search pages by keyword prefix without touching subject info", async () => {
+  await withTempCwd(async () => {
+    const { deleteServerCacheByKeyPrefix, readServerCache, writeServerCache } = loadServerCache();
+
+    await writeServerCache("bangumi-search-v2", "oni::page=1::size=8", { page: 1 });
+    await writeServerCache("bangumi-search-v2", "oni::page=2::size=8", { page: 2 });
+    await writeServerCache("bangumi-search-v2", "onii::page=1::size=8", { page: 1 });
+    await writeServerCache("bangumi-subject-info", "oni", { kind: "episode-list" });
+
+    await deleteServerCacheByKeyPrefix("bangumi-search-v2", "oni::page=");
+
+    assert.equal(await readServerCache("bangumi-search-v2", "oni::page=1::size=8", 60_000), undefined);
+    assert.equal(await readServerCache("bangumi-search-v2", "oni::page=2::size=8", 60_000), undefined);
+    assert.deepEqual(await readServerCache("bangumi-search-v2", "onii::page=1::size=8", 60_000), { page: 1 });
+    assert.deepEqual(await readServerCache("bangumi-subject-info", "oni", 60_000), { kind: "episode-list" });
+  });
+});

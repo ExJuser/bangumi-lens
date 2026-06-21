@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 type ServerCacheEntry<T> = {
@@ -32,6 +32,30 @@ export async function writeServerCache<T>(namespace: string, key: string, value:
     value
   };
   await writeFile(filePath, `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+}
+
+export async function deleteServerCache(namespace: string, key: string) {
+  await rm(getCacheFilePath(namespace, key), { force: true });
+}
+
+export async function deleteServerCacheByKeyPrefix(namespace: string, keyPrefix: string) {
+  const namespaceDir = path.join(CACHE_DIR, namespace);
+  let entries: string[];
+
+  try {
+    entries = await readdir(namespaceDir);
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? error.code : undefined;
+    if (code === "ENOENT") return;
+    throw error;
+  }
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.endsWith(".json"))
+      .filter((entry) => decodeURIComponent(entry.slice(0, -".json".length)).startsWith(keyPrefix))
+      .map((entry) => rm(path.join(namespaceDir, entry), { force: true }))
+  );
 }
 
 export async function clearServerCache() {

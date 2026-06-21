@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchBangumiSubjectInfo } from "@/lib/bangumi";
 import { appendAppLog, errorFields } from "@/lib/logger";
-import { readServerCache, writeServerCache } from "@/lib/server-cache";
+import { deleteServerCache, readServerCache, writeServerCache } from "@/lib/server-cache";
 import {
   CachedSubjectInfoPayload,
   hasCurrentSubjectInfoCacheSchema,
@@ -27,6 +27,10 @@ export async function GET(request: Request) {
   }
 
   try {
+    if (refresh) {
+      await deleteServerCache(SUBJECT_INFO_CACHE_NAMESPACE, subjectId);
+    }
+
     const cached = await readServerCache<CachedSubjectInfoPayload>(
       SUBJECT_INFO_CACHE_NAMESPACE,
       subjectId,

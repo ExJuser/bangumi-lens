@@ -1599,6 +1599,7 @@ export default function BangumiLensApp() {
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [refreshingSearchResults, setRefreshingSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchPagination, setSearchPagination] = useState<SearchPagination | null>(null);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
@@ -2739,7 +2740,8 @@ export default function BangumiLensApp() {
     void runAnalysis(trimmedUrl);
   }, [history, runAnalysis]);
 
-  async function searchByTitle(query: string, page = 1) {
+  async function searchByTitle(query: string, page = 1, options: { refresh?: boolean } = {}) {
+    const refresh = Boolean(options.refresh);
     const isPagingCurrentSearch =
       searchPagination && normalizeSearchText(searchPagination.query) === normalizeSearchText(query);
 
@@ -2755,9 +2757,14 @@ export default function BangumiLensApp() {
     setSelectedSearchEpisodeIds(new Set());
     setSearchSelectionError("");
     setSearching(true);
+    if (refresh) {
+      setRefreshingSearchResults(true);
+    }
 
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&page=${page}`, { cache: "no-store" });
+      const params = new URLSearchParams({ q: query, page: String(page) });
+      if (refresh) params.set("refresh", "1");
+      const response = await fetch(`/api/search?${params.toString()}`, { cache: "no-store" });
       const payload = (await response.json()) as {
         results?: SearchResult[];
         total?: number;
@@ -2796,6 +2803,9 @@ export default function BangumiLensApp() {
       setError(caught instanceof Error ? caught.message : "搜索失败，请稍后重试。");
     } finally {
       setSearching(false);
+      if (refresh) {
+        setRefreshingSearchResults(false);
+      }
     }
   }
 
@@ -2946,6 +2956,11 @@ export default function BangumiLensApp() {
   function refreshSelectedSearchResult() {
     if (!selectedSearchResult || loadingSearchEpisodes) return;
     void selectSearchResult(selectedSearchResult, { refresh: true });
+  }
+
+  function refreshCurrentSearchResults() {
+    if (!searchPagination || searching) return;
+    void searchByTitle(searchPagination.query, searchPagination.page, { refresh: true });
   }
 
   function selectSearchEpisode(episode: SearchEpisodeChoice) {
@@ -3749,9 +3764,22 @@ export default function BangumiLensApp() {
                 <span className="label">搜索结果</span>
                 <h2 id="search-selection-title">选择作品和章节</h2>
               </div>
-              <button className="secondary-action" type="button" onClick={closeSearchSelectionDialog}>
-                关闭
-              </button>
+              <div className="search-selection-actions">
+                {searchPagination ? (
+                  <button
+                    className="secondary-action search-selection-refresh"
+                    type="button"
+                    onClick={refreshCurrentSearchResults}
+                    disabled={searching}
+                  >
+                    <RefreshCw className={refreshingSearchResults ? "spin" : ""} size={14} />
+                    刷新作品
+                  </button>
+                ) : null}
+                <button className="secondary-action" type="button" onClick={closeSearchSelectionDialog}>
+                  关闭
+                </button>
+              </div>
             </div>
             <div className="search-selection-grid">
               <section className="search-selection-column" aria-label="作品选择">
@@ -3922,6 +3950,15 @@ export default function BangumiLensApp() {
                         ) : null}
                         <div className="episode-choice-footer">
                           <span>已选 {selectedSearchEpisodes.length} 话</span>
+                          <button
+                            className="secondary-action episode-choice-refresh"
+                            type="button"
+                            onClick={refreshSelectedSearchResult}
+                            disabled={loadingSearchEpisodes}
+                          >
+                            <RefreshCw size={14} />
+                            刷新话数
+                          </button>
                           <button
                             className="primary-action"
                             type="button"

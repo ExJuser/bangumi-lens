@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { configureServerProxy } from "@/lib/proxy";
-import { readServerCache, writeServerCache } from "@/lib/server-cache";
+import { deleteServerCacheByKeyPrefix, readServerCache, writeServerCache } from "@/lib/server-cache";
 import {
   CachedSubjectInfoPayload,
   hasCurrentSubjectInfoCacheSchema,
@@ -79,6 +79,10 @@ function normalizePage(page: string | null) {
 
 function buildSearchCacheKey(query: string, page: number) {
   return `${query}::page=${page}::size=${SEARCH_PAGE_SIZE}`;
+}
+
+function buildSearchCacheKeyPrefix(query: string) {
+  return `${query}::page=`;
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | undefined> {
@@ -229,26 +233,39 @@ export async function GET(request: Request) {
   const query = searchParams.get("q") || "";
   const normalizedQuery = normalizeQuery(query);
   const page = normalizePage(searchParams.get("page"));
+  const refresh = searchParams.get("refresh") === "1";
   const cacheKey = buildSearchCacheKey(normalizedQuery, page);
 
   if (normalizedQuery.length < 2) {
     return NextResponse.json({ error: "搜索词至少需要 2 个字符。" }, { status: 400 });
   }
 
+  if (refresh) {
+    const cacheKeyPrefix = buildSearchCacheKeyPrefix(normalizedQuery);
+    for (const key of cache.keys()) {
+      if (key.startsWith(cacheKeyPrefix)) {
+        cache.delete(key);
+      }
+    }
+    await deleteServerCacheByKeyPrefix(SEARCH_CACHE_NAMESPACE, cacheKeyPrefix);
+  }
+
   const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (!refresh && cached && cached.expiresAt > Date.now()) {
     return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(cached.payload)), cached: true });
   }
 
-  const diskCached = await readServerCache<SearchPayload>(SEARCH_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS);
-  if (diskCached?.results) {
+  const diskCached = !refresh
+    ? await readServerCache<SearchPayload>(SEARCH_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS)
+    : undefined;
+  if (!refresh && diskCached?.results) {
     cache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: diskCached });
     return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(diskCached)), cached: true });
   }
 
   try {
     configureServerProxy();
-    await appendAppLog("info", "search.request.start", { query: normalizedQuery, page });
+    await appendAppLog("info", "search.request.start", { query: normalizedQuery, page, refresh });
     const payload = await buildSearchPayload(query.trim(), page);
     cache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload });
     await writeServerCache(SEARCH_CACHE_NAMESPACE, cacheKey, payload);
