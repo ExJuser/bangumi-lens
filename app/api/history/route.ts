@@ -8,6 +8,7 @@ import {
   updateHistoryReportLike
 } from "@/lib/history-store";
 import { appendAppLog, errorFields } from "@/lib/logger";
+import { clearServerCache } from "@/lib/server-cache";
 import type { AnalyzeReport } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -79,14 +80,14 @@ export async function DELETE(request: Request) {
     const startedAt = Date.now();
 
     try {
-      const history = await clearHistoryReports();
-      await appendAppLog("info", "history.clear.complete", {
+      const [history] = await Promise.all([clearHistoryReports(), clearServerCache()]);
+      await appendAppLog("info", "local-data.clear.complete", {
         count: history.length,
         durationMs: Date.now() - startedAt
       });
       return NextResponse.json({ history });
     } catch (error) {
-      await appendAppLog("error", "history.clear.failed", {
+      await appendAppLog("error", "local-data.clear.failed", {
         ...errorFields(error),
         durationMs: Date.now() - startedAt
       });

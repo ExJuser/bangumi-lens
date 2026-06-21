@@ -31,7 +31,7 @@ test("current episode header actions ask for confirmation before mutating histor
   );
 });
 
-test("clear all reports is tucked behind a history title icon and confirmation dialog", () => {
+test("clear all local content is tucked behind a history title icon and confirmation dialog", () => {
   const pagePath = join(process.cwd(), "app", "components", "bangumi-lens-app.tsx");
   const cssPath = join(process.cwd(), "app", "globals.css");
   const pageSource = readFileSync(pagePath, "utf8");
@@ -41,7 +41,8 @@ test("clear all reports is tucked behind a history title icon and confirmation d
   assert.match(pageSource, /confirmClearHistory/);
   assert.match(pageSource, /JSON\.stringify\(\{ all: true \}\)/);
   assert.match(pageSource, /className="history-clear"/);
-  assert.match(pageSource, /title="确认清空全部本地报告？"/);
+  assert.match(pageSource, /title="确认清空全部报告和缓存？"/);
+  assert.match(pageSource, /全部缓存内容/);
   assert.match(cssSource, /\.history-clear\s*\{[\s\S]*?opacity:\s*0;/);
   assert.match(cssSource, /\.history-title:hover\s+\.history-clear/);
 });

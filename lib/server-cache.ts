@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 type ServerCacheEntry<T> = {
@@ -32,4 +32,8 @@ export async function writeServerCache<T>(namespace: string, key: string, value:
     value
   };
   await writeFile(filePath, `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+}
+
+export async function clearServerCache() {
+  await rm(CACHE_DIR, { recursive: true, force: true });
 }

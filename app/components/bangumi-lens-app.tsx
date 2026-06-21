@@ -2856,8 +2856,8 @@ export default function BangumiLensApp() {
               className="history-clear"
               type="button"
               onClick={() => setClearHistoryPrompt(true)}
-              title="清空全部报告"
-              aria-label="清空全部报告"
+              title="清空全部报告和缓存"
+              aria-label="清空全部报告和缓存"
             >
               <Trash2 size={16} />
             </button>
@@ -3552,17 +3552,17 @@ export default function BangumiLensApp() {
         <ConfirmDialog
           titleId="clear-history-title"
           icon={<Trash2 size={20} />}
-          label="清空历史"
-          title="确认清空全部本地报告？"
+          label="清空本地内容"
+          title="确认清空全部报告和缓存？"
           description={
             <>
-              将删除本机保存的全部 {history.length} 份报告和历史索引。这个操作不会删除 Bangumi 上的内容，但本地报告无法从这里恢复。
+              将删除本机保存的全部 {history.length} 份报告、历史索引和全部缓存内容。这个操作不会删除 Bangumi 上的内容，但本地报告和缓存无法从这里恢复。
             </>
           }
           onClose={() => setClearHistoryPrompt(false)}
           actions={[
             { label: "取消", onClick: () => setClearHistoryPrompt(false), className: "secondary-action" },
-            { label: "清空全部报告", onClick: confirmClearHistory, className: "primary-action" }
+            { label: "清空全部内容", onClick: confirmClearHistory, className: "primary-action" }
           ]}
         />
       ) : null}
