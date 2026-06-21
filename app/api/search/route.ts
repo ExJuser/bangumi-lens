@@ -23,6 +23,13 @@ type BangumiSubject = {
   eps?: number;
   total_episodes?: number;
   date?: string;
+  images?: {
+    common?: string;
+    grid?: string;
+    large?: string;
+    medium?: string;
+    small?: string;
+  };
 };
 
 type BangumiEpisode = {
@@ -37,6 +44,7 @@ export type SearchResult = {
   subjectId: string;
   title: string;
   titleCn?: string;
+  coverUrl?: string;
   episodeTotal?: number;
   subjectInfo?: SubjectInfoPayload;
   firstEpisodeId: string;
@@ -56,7 +64,7 @@ type SearchPayload = {
 const SEARCH_PAGE_SIZE = 8;
 const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5;
 const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const SEARCH_CACHE_NAMESPACE = "bangumi-search-v2";
+const SEARCH_CACHE_NAMESPACE = "bangumi-search-v3";
 const cache = new Map<string, { expiresAt: number; payload: SearchPayload }>();
 
 function normalizeQuery(query: string) {
@@ -69,6 +77,17 @@ function getSubjectTitle(subject: BangumiSubject) {
 
 function getEpisodeTitle(episode: BangumiEpisode) {
   return episode.name_cn?.trim() || episode.name?.trim() || undefined;
+}
+
+function getSubjectCoverUrl(subject: BangumiSubject) {
+  return (
+    subject.images?.grid ||
+    subject.images?.common ||
+    subject.images?.medium ||
+    subject.images?.large ||
+    subject.images?.small ||
+    undefined
+  );
 }
 
 function normalizePage(page: string | null) {
@@ -145,6 +164,7 @@ async function buildSearchResults(subjects: BangumiSubject[]) {
         subjectId: String(subject.id),
         title: subject.name?.trim() || getSubjectTitle(subject),
         titleCn: subject.name_cn?.trim() || undefined,
+        coverUrl: getSubjectCoverUrl(subject),
         episodeTotal: Number.isFinite(episodeTotal) && episodeTotal > 0 ? episodeTotal : undefined,
         firstEpisodeId: String(episode.id),
         firstEpisodeTitle: getEpisodeTitle(episode),

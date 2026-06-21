@@ -27,6 +27,7 @@ import {
   ThumbsUp,
   X
 } from "lucide-react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -311,6 +312,7 @@ type SearchResult = {
   subjectId: string;
   title: string;
   titleCn?: string;
+  coverUrl?: string;
   episodeTotal?: number;
   subjectInfo?: SubjectInfo;
   firstEpisodeId: string;
@@ -3823,7 +3825,10 @@ export default function BangumiLensApp() {
                       type="button"
                       onClick={() => selectSearchResult(result)}
                     >
-                      <span>{getSearchResultTitle(result)}</span>
+                      <span className="search-result-cover" aria-hidden="true">
+                        {result.coverUrl ? <Image alt="" src={result.coverUrl} fill sizes="42px" unoptimized /> : null}
+                      </span>
+                      <span className="search-result-title">{getSearchResultTitle(result)}</span>
                       <strong>{getSearchResultSubtitle(result)}</strong>
                       {result.episodeTotal ? <em>全 {result.episodeTotal} 话</em> : null}
                     </button>
