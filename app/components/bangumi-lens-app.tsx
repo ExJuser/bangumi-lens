@@ -3826,7 +3826,7 @@ export default function BangumiLensApp() {
                       onClick={() => selectSearchResult(result)}
                     >
                       <span className="search-result-cover" aria-hidden="true">
-                        {result.coverUrl ? <Image alt="" src={result.coverUrl} fill sizes="42px" unoptimized /> : null}
+                        {result.coverUrl ? <Image alt="" src={result.coverUrl} fill sizes="58px" unoptimized /> : null}
                       </span>
                       <span className="search-result-title">{getSearchResultTitle(result)}</span>
                       <strong>{getSearchResultSubtitle(result)}</strong>

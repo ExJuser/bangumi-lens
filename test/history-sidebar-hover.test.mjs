@@ -98,6 +98,26 @@ test("search selection lists keep sparse results at content height", () => {
   );
 });
 
+test("search result covers use the larger six-result layout", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(
+    css,
+    /\.search-results:has\(> button:nth-child\(6\)\)\s*\{[\s\S]*?grid-template-rows:\s*repeat\(6,\s*minmax\(96px,\s*1fr\)\);/,
+    "Search results should reserve space for six larger subject rows"
+  );
+  assert.match(
+    css,
+    /\.search-results button\s*\{[\s\S]*?grid-template-columns:\s*58px minmax\(0,\s*1fr\) auto;/,
+    "Search result rows should allocate a wider cover column"
+  );
+  assert.match(
+    css,
+    /\.search-result-cover\s*\{[\s\S]*?width:\s*58px;[\s\S]*?height:\s*78px;/,
+    "Search result covers should be large enough to identify subjects"
+  );
+});
+
 test("history action buttons stay above non-interactive metadata", () => {
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
   const historyItemLabelRule = css.match(/\.history-item-label\s*\{[^}]*\}/)?.[0] || "";

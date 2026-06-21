@@ -61,10 +61,10 @@ type SearchPayload = {
   hasNext: boolean;
 };
 
-const SEARCH_PAGE_SIZE = 8;
+const SEARCH_PAGE_SIZE = 6;
 const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5;
 const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const SEARCH_CACHE_NAMESPACE = "bangumi-search-v3";
+const SEARCH_CACHE_NAMESPACE = "bangumi-search-v4";
 const cache = new Map<string, { expiresAt: number; payload: SearchPayload }>();
 
 function normalizeQuery(query: string) {

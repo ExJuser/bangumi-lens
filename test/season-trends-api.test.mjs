@@ -63,7 +63,7 @@ test("search API attaches cached empty subject episode lists to results", () => 
 test("search API backfills pages with usable Bangumi subjects and caches pages separately", () => {
   const source = readFileSync(join(process.cwd(), "app", "api", "search", "route.ts"), "utf8");
 
-  assert.match(source, /const SEARCH_PAGE_SIZE = 8/);
+  assert.match(source, /const SEARCH_PAGE_SIZE = 6/);
   assert.match(source, /const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5/);
   assert.match(source, /search\/subjects\?limit=\$\{SEARCH_PAGE_SIZE\}&offset=\$\{offset\}/);
   assert.match(source, /let offset = 0/);
