@@ -218,6 +218,7 @@ function HoverScrollText({ className, text }: { className?: string; text: string
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
 const HOME_ROUTE = "/home";
 const REPORT_ROUTE_PREFIX = "/reports/";
+const SUMMARY_ROUTE_PREFIX = "/summary/";
 const REPORT_STALE_THRESHOLD_MS = 15 * 24 * 60 * 60 * 1000;
 type ThemeMode = "day" | "night";
 type EpisodeDirection = "previous" | "next";
@@ -974,6 +975,10 @@ function getSubjectKey(report: Report) {
   return getSubjectKeyFromMeta(report.meta);
 }
 
+function getSummaryRouteIdFromMeta(meta: Report["meta"]) {
+  return meta.subjectId || getSubjectNameFromMeta(meta);
+}
+
 function getHeroSubjectTitle(meta: Report["meta"]) {
   return meta.subjectTitle || meta.subjectTitleCn || "未分类动画";
 }
@@ -988,6 +993,17 @@ function isSavedReportLiked(item?: SavedReport | null) {
 
 function isSameReportEpisode(item: SavedReport, currentReport: Report) {
   return getSavedReportMeta(item).url === currentReport.meta.url;
+}
+
+function findSummaryRouteReport(history: SavedReport[], summaryId: string) {
+  return history.find((item) => {
+    const meta = getSavedReportMeta(item);
+    return meta.subjectId === summaryId || getSubjectNameFromMeta(meta) === summaryId;
+  });
+}
+
+function isSameSummaryRouteSubject(meta: Report["meta"], summaryId: string) {
+  return meta.subjectId === summaryId || getSubjectNameFromMeta(meta) === summaryId;
 }
 
 function getEpisodeSortValue(item: SavedReport) {
@@ -1352,9 +1368,22 @@ function getReportRoute(itemId: string) {
   return `${REPORT_ROUTE_PREFIX}${encodeURIComponent(itemId)}`;
 }
 
-function getReportIdFromPath(pathname: string) {
-  if (!pathname.startsWith(REPORT_ROUTE_PREFIX)) return "";
-  return decodeURIComponent(pathname.slice(REPORT_ROUTE_PREFIX.length).split("/")[0] || "");
+function getSummaryRoute(itemId: string) {
+  return `${SUMMARY_ROUTE_PREFIX}${encodeURIComponent(itemId)}`;
+}
+
+function getRouteItemId(pathname: string) {
+  const prefix = pathname.startsWith(REPORT_ROUTE_PREFIX)
+    ? REPORT_ROUTE_PREFIX
+    : pathname.startsWith(SUMMARY_ROUTE_PREFIX)
+      ? SUMMARY_ROUTE_PREFIX
+      : "";
+  if (!prefix) return "";
+  return decodeURIComponent(pathname.slice(prefix.length).split("/")[0] || "");
+}
+
+function isSummaryPath(pathname: string) {
+  return pathname.startsWith(SUMMARY_ROUTE_PREFIX);
 }
 
 function isHomePath(pathname: string) {
@@ -1485,6 +1514,7 @@ export default function BangumiLensApp() {
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
   const currentSubjectKey = report ? getSubjectKey(report) : "";
+  const summaryRoute = isSummaryPath(pathname);
   const visibleSeasonReportGeneration =
     seasonReportGeneration?.subjectKey === currentSubjectKey ? seasonReportGeneration : null;
   const visiblePendingSeasonReportGeneration =
@@ -1545,7 +1575,7 @@ export default function BangumiLensApp() {
     };
   }, [modalOpen]);
 
-  const openSavedReport = useCallback(async (item: SavedReport, options?: { replace?: boolean }) => {
+  const openSavedReport = useCallback(async (item: SavedReport, options?: { replace?: boolean; route?: "report" | "summary" }) => {
     const currentReportUrl = report?.meta.url;
     const targetReportUrl = item.report?.meta.url || item.meta?.url || item.url;
     const shouldMaskSwitch = Boolean(currentReportUrl && targetReportUrl && currentReportUrl !== targetReportUrl);
@@ -1582,9 +1612,13 @@ export default function BangumiLensApp() {
       setHistory((currentHistory) =>
         currentHistory.map((historyItem) => (historyItem.id === item.id ? { ...historyItem, report: nextReport } : historyItem))
       );
-      const route = getReportRoute(item.id);
+      const routeMode = options?.route || (summaryRoute ? "summary" : "report");
+      const route =
+        routeMode === "summary"
+          ? getSummaryRoute(getSummaryRouteIdFromMeta(nextReport.meta))
+          : getReportRoute(item.id);
       if (window.location.pathname !== route) {
-        pendingRouteReportIdRef.current = item.id;
+        pendingRouteReportIdRef.current = getRouteItemId(route);
         if (options?.replace) {
           router.replace(route);
         } else {
@@ -1598,10 +1632,10 @@ export default function BangumiLensApp() {
         scheduleReportSwitchingEnd();
       }
     }
-  }, [report?.meta.url, router, scheduleReportSwitchingEnd]);
+  }, [report?.meta.url, router, scheduleReportSwitchingEnd, summaryRoute]);
 
   useEffect(() => {
-    const routeReportId = getReportIdFromPath(pathname);
+    const routeReportId = getRouteItemId(pathname);
     if (pendingRouteReportIdRef.current === routeReportId) {
       pendingRouteReportIdRef.current = null;
     }
@@ -1912,7 +1946,7 @@ export default function BangumiLensApp() {
     toggleReportLike(item, liked);
   }
 
-  async function loadSeasonTrend() {
+  const loadSeasonTrend = useCallback(async () => {
     const currentReport = report;
     const subjectName = currentReport ? getSubjectName(currentReport) : "";
     if (!currentReport?.meta.subjectId && !subjectName) {
@@ -1944,7 +1978,7 @@ export default function BangumiLensApp() {
     } finally {
       setSeasonTrendLoading(false);
     }
-  }
+  }, [report]);
 
   async function requestSeasonTrendAiSummary() {
     if (!seasonTrend?.available || seasonTrendAiSummaryLoading) return;
@@ -2532,7 +2566,7 @@ export default function BangumiLensApp() {
     if (!historyLoaded) return;
 
     async function openRouteReport() {
-      const routeReportId = getReportIdFromPath(pathname);
+      const routeReportId = getRouteItemId(pathname);
       if (returningHomeRef.current) {
         loadedRouteReportIdRef.current = null;
         if (!routeReportId) {
@@ -2549,13 +2583,28 @@ export default function BangumiLensApp() {
       }
 
       if (pendingRouteReportIdRef.current && pendingRouteReportIdRef.current !== routeReportId) return;
-      if (loadedRouteReportIdRef.current === routeReportId) return;
-      const routeItem = history.find((item) => item.id === routeReportId) || { id: routeReportId } as SavedReport;
-      await openSavedReport(routeItem, { replace: true });
+      const routeMode = summaryRoute ? "summary" : "report";
+      const loadedRouteKey = `${routeMode}:${routeReportId}`;
+      if (loadedRouteReportIdRef.current === loadedRouteKey) return;
+      if (summaryRoute && report && isSameSummaryRouteSubject(report.meta, routeReportId)) {
+        loadedRouteReportIdRef.current = loadedRouteKey;
+        return;
+      }
+      const routeItem = summaryRoute
+        ? findSummaryRouteReport(history, routeReportId)
+        : history.find((item) => item.id === routeReportId) || { id: routeReportId } as SavedReport;
+      if (!routeItem) return;
+      await openSavedReport(routeItem, { replace: true, route: routeMode });
+      loadedRouteReportIdRef.current = loadedRouteKey;
     }
 
     void openRouteReport();
-  }, [history, historyLoaded, openSavedReport, pathname]);
+  }, [history, historyLoaded, openSavedReport, pathname, report, summaryRoute]);
+
+  useEffect(() => {
+    if (!summaryRoute || !report || showSeasonTrend || seasonTrendLoading) return;
+    void loadSeasonTrend();
+  }, [loadSeasonTrend, report, seasonTrendLoading, showSeasonTrend, summaryRoute]);
 
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3015,10 +3064,19 @@ export default function BangumiLensApp() {
                   <ChevronRight size={17} />
                 </button>
                 <button
-                  className={showSeasonTrend ? "season-trend-toggle active" : "season-trend-toggle"}
+                  className={summaryRoute ? "season-trend-toggle active" : "season-trend-toggle"}
                   type="button"
-                  onClick={() => (showSeasonTrend ? setShowSeasonTrend(false) : void loadSeasonTrend())}
-                  aria-pressed={showSeasonTrend}
+                  onClick={() => {
+                    if (!currentSavedReport) return;
+                    setShowSeasonTrend(false);
+                    if (summaryRoute) {
+                      router.push(getReportRoute(currentSavedReport.id));
+                      return;
+                    }
+                    router.push(getSummaryRoute(getSummaryRouteIdFromMeta(getSavedReportMeta(currentSavedReport))));
+                  }}
+                  disabled={!currentSavedReport}
+                  aria-pressed={summaryRoute}
                   title="查看作品趋势"
                 >
                   <BarChart3 size={17} />
@@ -3059,7 +3117,7 @@ export default function BangumiLensApp() {
             );
           })()}
 
-          {showSeasonTrend ? (
+          {summaryRoute || showSeasonTrend ? (
             <SeasonTrendPanel
               trends={seasonTrend}
               loading={seasonTrendLoading}
@@ -3074,6 +3132,8 @@ export default function BangumiLensApp() {
             />
           ) : null}
 
+          {!summaryRoute ? (
+          <>
           <div className="report-grid">
             <article className="panel primary">
               <div className="panel-title">
@@ -3156,6 +3216,8 @@ export default function BangumiLensApp() {
                 </ol>
               </div>
             </article>
+          ) : null}
+          </>
           ) : null}
         </section>
       ) : null}
