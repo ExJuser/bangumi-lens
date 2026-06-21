@@ -81,6 +81,22 @@ test("season generation filters cached episode lists by official episode total",
   assert.match(source, /isWithinMainEpisodeTotal\(episode, subjectInfo\?\.episodeTotal \?\? result\.episodeTotal\)/);
 });
 
+test("episode picker search only matches titles and exact arabic episode numbers", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const matcherBody = source.slice(
+    source.indexOf("export function matchesSearchEpisodeQuery"),
+    source.indexOf("export function filterSearchEpisodes")
+  );
+
+  assert.match(source, /placeholder="搜索话数或标题"/);
+  assert.match(matcherBody, /\^\\d\+\$/);
+  assert.match(matcherBody, /String\(episode\.sort\) === normalizedQuery/);
+  assert.match(matcherBody, /\[episode\.title, episode\.titleCn\]/);
+  assert.doesNotMatch(matcherBody, /episode\.airdate/);
+  assert.doesNotMatch(matcherBody, /episode\.id/);
+  assert.doesNotMatch(matcherBody, /getEpisodeChoiceLabel/);
+});
+
 test("season report generation progress shows active in-flight progress", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");

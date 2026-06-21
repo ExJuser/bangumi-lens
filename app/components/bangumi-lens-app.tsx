@@ -396,6 +396,23 @@ function getEpisodeChoiceLabel(episode: EpisodeAvailabilitySignals) {
   return title ? `${episodeNumber} ${title}` : episodeNumber;
 }
 
+export function matchesSearchEpisodeQuery(episode: EpisodeAvailabilitySignals, query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+
+  if (/^\d+$/.test(normalizedQuery)) {
+    return typeof episode.sort === "number" && String(episode.sort) === normalizedQuery;
+  }
+
+  return [episode.title, episode.titleCn]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => normalizeSearchText(value).includes(normalizedQuery));
+}
+
+export function filterSearchEpisodes<T extends EpisodeAvailabilitySignals>(episodes: T[], query: string) {
+  return episodes.filter((episode) => matchesSearchEpisodeQuery(episode, query));
+}
+
 function isWithinMainEpisodeTotal(episode: Pick<EpisodeAvailabilitySignals, "sort">, episodeTotal?: number) {
   if (typeof episodeTotal !== "number" || episodeTotal <= 0) return true;
   return typeof episode.sort !== "number" || episode.sort <= episodeTotal;
@@ -1614,22 +1631,7 @@ export default function BangumiLensApp() {
   );
 
   const filteredSearchEpisodes = useMemo(() => {
-    const normalizedQuery = normalizeSearchText(searchEpisodeQuery);
-    if (!normalizedQuery) return searchEpisodes;
-
-    return searchEpisodes.filter((episode) => {
-      const fields = [
-        getEpisodeChoiceLabel(episode),
-        episode.title,
-        episode.titleCn,
-        episode.airdate,
-        typeof episode.sort === "number" ? String(episode.sort) : undefined,
-        episode.id
-      ];
-      return fields
-        .filter((value): value is string => Boolean(value))
-        .some((value) => normalizeSearchText(value).includes(normalizedQuery));
-    });
+    return filterSearchEpisodes(searchEpisodes, searchEpisodeQuery);
   }, [searchEpisodeQuery, searchEpisodes]);
 
   const selectedSearchEpisodes = useMemo(
@@ -3679,7 +3681,7 @@ export default function BangumiLensApp() {
                               id="episode-choice-search"
                               value={searchEpisodeQuery}
                               onChange={(event) => setSearchEpisodeQuery(event.target.value)}
-                              placeholder="搜索话数、标题或日期"
+                              placeholder="搜索话数或标题"
                             />
                             {searchEpisodeQuery ? (
                               <button
