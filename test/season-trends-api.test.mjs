@@ -34,12 +34,13 @@ test("season trend AI summary is only exposed through explicit POST route", () =
   assert.doesNotMatch(loadSeasonTrendBody, /\/api\/season-trends\/summary/);
 });
 
-test("subject info API refreshes old cache entries without episode lists", () => {
+test("subject info API refreshes old cache entries without episode lists but reuses empty lists", () => {
   const routePath = join(process.cwd(), "app", "api", "subject-info", "route.ts");
   const source = readFileSync(routePath, "utf8");
 
-  assert.match(source, /function hasEpisodeList/);
+  assert.match(source, /function hasEpisodeListField/);
   assert.match(source, /Array\.isArray\(subjectInfo\?\.episodes\)/);
+  assert.doesNotMatch(source, /subjectInfo\.episodes\.length > 0/);
   assert.match(source, /SUBJECT_INFO_CACHE_SCHEMA_VERSION = 2/);
   assert.match(source, /hasCurrentCacheSchema\(cached\)/);
   assert.match(source, /cacheSchemaVersion: SUBJECT_INFO_CACHE_SCHEMA_VERSION/);

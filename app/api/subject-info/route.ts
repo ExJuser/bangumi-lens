@@ -16,8 +16,8 @@ type CachedSubjectInfoPayload = SubjectInfoPayload & {
   cacheSchemaVersion?: number;
 };
 
-function hasEpisodeList(subjectInfo: SubjectInfoPayload | undefined) {
-  return Array.isArray(subjectInfo?.episodes) && subjectInfo.episodes.length > 0;
+function hasEpisodeListField(subjectInfo: SubjectInfoPayload | undefined) {
+  return Array.isArray(subjectInfo?.episodes);
 }
 
 function hasCurrentCacheSchema(subjectInfo: CachedSubjectInfoPayload | undefined) {
@@ -25,7 +25,7 @@ function hasCurrentCacheSchema(subjectInfo: CachedSubjectInfoPayload | undefined
 }
 
 function isEpisodeTotalConsistent(subjectInfo: SubjectInfoPayload | undefined) {
-  if (!subjectInfo || typeof subjectInfo.episodeTotal !== "number" || !hasEpisodeList(subjectInfo)) return true;
+  if (!subjectInfo || typeof subjectInfo.episodeTotal !== "number" || !hasEpisodeListField(subjectInfo)) return true;
   const episodes = subjectInfo.episodes || [];
   return episodes.every(
     (episode) => typeof episode.sort !== "number" || episode.sort <= subjectInfo.episodeTotal!
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       subjectId,
       SUBJECT_INFO_CACHE_TTL_MS
     );
-    if (cached && hasCurrentCacheSchema(cached) && hasEpisodeList(cached) && isEpisodeTotalConsistent(cached)) {
+    if (cached && hasCurrentCacheSchema(cached) && hasEpisodeListField(cached) && isEpisodeTotalConsistent(cached)) {
       await appendAppLog("info", "subject-info.request.cache_hit", {
         subjectId,
         durationMs: Date.now() - startedAt
