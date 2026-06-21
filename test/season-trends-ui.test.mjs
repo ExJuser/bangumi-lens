@@ -201,8 +201,8 @@ test("search selection dialog shows and resubmits the current keyword", () => {
   assert.match(source, /aria-label="搜索关键词"/);
   assert.match(source, />\s*搜索\s*</);
   assert.match(submitBody, /searchKeywordDraft\.trim\(\)/);
-  assert.match(submitBody, /searchByTitle\(nextKeyword, 1, \{ resetResults: true \}\)/);
-  assert.match(source, /const resetResults = Boolean\(options\.resetResults\)/);
+  assert.match(submitBody, /searchByTitle\(nextKeyword, 1\)/);
+  assert.doesNotMatch(submitBody, /resetResults/);
   assert.match(css, /\.search-selection-head\s*\{[\s\S]*?grid-template-columns:\s*minmax\(220px,\s*1fr\) minmax\(320px,\s*452px\) minmax\(180px,\s*1fr\);/);
   assert.match(css, /\.search-keyword-control\s*\{/);
   assert.match(css, /\.search-keyword-control input\s*\{[\s\S]*?font-size:\s*16px;/);

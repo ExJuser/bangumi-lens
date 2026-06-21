@@ -2774,11 +2774,10 @@ export default function BangumiLensApp() {
     void runAnalysis(trimmedUrl);
   }, [history, runAnalysis]);
 
-  async function searchByTitle(query: string, page = 1, options: { refresh?: boolean; resetResults?: boolean } = {}) {
+  async function searchByTitle(query: string, page = 1, options: { refresh?: boolean } = {}) {
     const refresh = Boolean(options.refresh);
-    const resetResults = Boolean(options.resetResults);
     const isPagingCurrentSearch =
-      !resetResults && searchPagination && normalizeSearchText(searchPagination.query) === normalizeSearchText(query);
+      searchPagination && normalizeSearchText(searchPagination.query) === normalizeSearchText(query);
 
     setError("");
     if (!isPagingCurrentSearch) {
@@ -3004,7 +3003,7 @@ export default function BangumiLensApp() {
     const nextKeyword = searchKeywordDraft.trim();
     if (!nextKeyword || searching) return;
 
-    void searchByTitle(nextKeyword, 1, { resetResults: true });
+    void searchByTitle(nextKeyword, 1);
   }
 
   function selectSearchEpisode(episode: SearchEpisodeChoice) {
