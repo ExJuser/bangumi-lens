@@ -1604,6 +1604,15 @@ input {
   transform: rotate(45deg);
 }
 
+.rating-popover::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  height: 10px;
+}
+
 .rating-metric:hover .rating-popover,
 .rating-metric:focus-within .rating-popover {
   opacity: 1;
