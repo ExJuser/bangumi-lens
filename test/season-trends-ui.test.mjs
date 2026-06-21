@@ -186,6 +186,28 @@ test("episode picker search only matches titles and exact arabic episode numbers
   assert.doesNotMatch(matcherBody, /getEpisodeChoiceLabel/);
 });
 
+test("search selection dialog shows and resubmits the current keyword", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const submitBody = source.slice(
+    source.indexOf("function submitSearchKeyword"),
+    source.indexOf("function selectSearchEpisode")
+  );
+
+  assert.match(source, /const \[searchKeywordDraft, setSearchKeywordDraft\] = useState\(""\)/);
+  assert.match(source, /setSearchKeywordDraft\(query\)/);
+  assert.match(source, /className="search-keyword-editor"/);
+  assert.match(source, /id="search-keyword-input"/);
+  assert.match(source, /aria-label="搜索关键词"/);
+  assert.match(source, /重新搜索/);
+  assert.match(submitBody, /searchKeywordDraft\.trim\(\)/);
+  assert.match(submitBody, /searchByTitle\(nextKeyword, 1\)/);
+  assert.match(css, /\.search-selection-head\s*\{[\s\S]*?grid-template-columns:\s*minmax\(220px,\s*1fr\) minmax\(320px,\s*452px\) minmax\(180px,\s*1fr\);/);
+  assert.match(css, /\.search-keyword-control\s*\{/);
+  assert.match(css, /\.search-keyword-control input\s*\{[\s\S]*?font-size:\s*16px;/);
+  assert.match(css, /\.search-keyword-control button\s*\{[\s\S]*?font-size:\s*15px;/);
+});
+
 test("episode picker paginates large episode lists and selects only the current page", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");

@@ -779,29 +779,22 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   gap: 8px;
   align-content: start;
   min-height: 0;
-  overflow: auto;
-  scrollbar-color: color-mix(in srgb, var(--muted) 34%, transparent) transparent;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  overflow: hidden;
 }
 
-:root[data-ui="polished"] .search-results:has(> button:nth-child(8)) {
-  grid-template-rows: repeat(8, minmax(58px, 1fr));
+:root[data-ui="polished"] .search-results:has(> button:nth-child(6)) {
+  grid-template-rows: repeat(6, minmax(83px, 1fr));
 }
 
-:root[data-ui="polished"] .search-results:hover {
-  scrollbar-color: color-mix(in srgb, var(--muted) 52%, transparent) transparent;
-}
-
-:root[data-ui="polished"] .search-results::-webkit-scrollbar, :root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar {
+:root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar {
   width: 8px;
 }
 
-:root[data-ui="polished"] .search-results::-webkit-scrollbar-track, :root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-track {
+:root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-track {
   background: transparent;
 }
 
-:root[data-ui="polished"] .search-results::-webkit-scrollbar-thumb, :root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-thumb {
+:root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-thumb {
   min-height: 44px;
   border: 2px solid transparent;
   border-radius: 999px;
@@ -809,17 +802,17 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   background-clip: padding-box;
 }
 
-:root[data-ui="polished"] .search-results:hover::-webkit-scrollbar-thumb, :root[data-ui="polished"] .episode-choice-list:hover::-webkit-scrollbar-thumb {
+:root[data-ui="polished"] .episode-choice-list:hover::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--muted) 52%, transparent);
   background-clip: padding-box;
 }
 
-:root[data-ui="polished"] .search-results::-webkit-scrollbar-thumb:hover, :root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-thumb:hover {
+:root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--accent) 55%, var(--muted));
   background-clip: padding-box;
 }
 
-:root[data-ui="polished"] .search-results::-webkit-scrollbar-button, :root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-button {
+:root[data-ui="polished"] .episode-choice-list::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
@@ -827,16 +820,18 @@ html[data-ui="polished"], html[data-ui="polished"] body {
 
 :root[data-ui="polished"] .search-results button {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px 10px;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 5px 12px;
+  align-items: center;
   width: 100%;
-  min-height: 58px;
+  min-height: 83px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
   color: var(--ink);
   cursor: pointer;
-  padding: 10px 12px;
+  padding: 9px 12px;
   text-align: left;
 }
 
@@ -854,23 +849,47 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   white-space: nowrap;
 }
 
-:root[data-ui="polished"] .search-results span {
+:root[data-ui="polished"] .search-result-cover {
+  position: relative;
   grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 58px;
+  height: 66px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+    color-mix(in srgb, var(--panel) 78%, var(--field));
+}
+
+:root[data-ui="polished"] .search-result-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:root[data-ui="polished"] .search-result-title {
+  grid-column: 2;
   color: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 850;
   line-height: 1.3;
 }
 
 :root[data-ui="polished"] .search-results strong {
-  grid-column: 1;
+  grid-column: 2;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 :root[data-ui="polished"] .search-results em {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1 / span 2;
   align-self: center;
   min-width: 52px;
@@ -1240,10 +1259,14 @@ html[data-ui="polished"], html[data-ui="polished"] body {
 }
 
 :root[data-ui="polished"] .search-selection-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 452px) minmax(180px, 1fr);
   gap: 16px;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+}
+
+:root[data-ui="polished"] .search-selection-title-block {
+  min-width: 0;
 }
 
 :root[data-ui="polished"] .search-selection-head h2 {
@@ -1253,7 +1276,73 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   line-height: 1.15;
 }
 
-:root[data-ui="polished"] .search-selection-head button {
+:root[data-ui="polished"] .search-keyword-editor {
+  justify-self: center;
+  width: 100%;
+}
+
+:root[data-ui="polished"] .search-keyword-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  padding: 0 6px 0 10px;
+}
+
+:root[data-ui="polished"] .search-keyword-control:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+:root[data-ui="polished"] .search-keyword-control svg {
+  color: var(--muted);
+}
+
+:root[data-ui="polished"] .search-keyword-control input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  outline: none;
+}
+
+:root[data-ui="polished"] .search-keyword-control input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+:root[data-ui="polished"] .search-keyword-control button {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 850;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+:root[data-ui="polished"] .search-keyword-control button:hover,
+:root[data-ui="polished"] .search-keyword-control button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent-dark);
+  outline: none;
+}
+
+:root[data-ui="polished"] .search-keyword-control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+:root[data-ui="polished"] .search-selection-actions button {
   min-height: 38px;
   border-radius: var(--radius-md);
   padding: 0 14px;
@@ -2803,7 +2892,7 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   background: var(--selected);
 }
 
-:root[data-ui="polished"] .recent-shortcut:focus-visible, :root[data-ui="polished"] .episode-nav button:focus-visible, :root[data-ui="polished"] .source-link-button:focus-visible, :root[data-ui="polished"] .search-selection-head button:focus-visible, :root[data-ui="polished"] .confirm-actions button:focus-visible {
+:root[data-ui="polished"] .recent-shortcut:focus-visible, :root[data-ui="polished"] .episode-nav button:focus-visible, :root[data-ui="polished"] .source-link-button:focus-visible, :root[data-ui="polished"] .search-selection-actions button:focus-visible, :root[data-ui="polished"] .confirm-actions button:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -2987,7 +3076,16 @@ html[data-ui="polished"], html[data-ui="polished"] body {
 
   :root[data-ui="polished"] .search-selection-head {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  :root[data-ui="polished"] .search-selection-title-block {
+    min-width: 0;
+  }
+
+  :root[data-ui="polished"] .search-keyword-editor {
+    justify-self: stretch;
+    width: 100%;
   }
 
   :root[data-ui="polished"] .search-selection-grid {
@@ -2999,11 +3097,11 @@ html[data-ui="polished"], html[data-ui="polished"] body {
     min-height: 220px;
   }
 
-  :root[data-ui="polished"] .search-results, :root[data-ui="polished"] .episode-choice-list {
+  :root[data-ui="polished"] .episode-choice-list {
     max-height: 320px;
   }
 
-  :root[data-ui="polished"] .search-results:has(> button:nth-child(8)) {
+  :root[data-ui="polished"] .search-results:has(> button:nth-child(6)) {
     grid-template-rows: none;
   }
 

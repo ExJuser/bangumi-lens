@@ -58,13 +58,19 @@ test("history sidebar uses a quiet custom scrollbar", () => {
   );
 });
 
-test("search selection lists use the quiet custom scrollbar", () => {
+test("search selection keeps subject candidates unscrolled and episode list scrollable", () => {
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const searchResultsRule = css.match(/\.search-results\s*\{[^}]*\}/)?.[0] || "";
 
   assert.match(
-    css,
-    /\.search-results\s*\{[\s\S]*?scrollbar-width:\s*thin;/,
-    "Search results should use a thin Firefox scrollbar instead of the wide default"
+    searchResultsRule,
+    /overflow:\s*hidden;/,
+    "Search result candidates should fit the page without showing an inner scrollbar"
+  );
+  assert.doesNotMatch(
+    searchResultsRule,
+    /scrollbar-width:/,
+    "Search result candidates should not opt into custom scrollbar styling"
   );
   assert.match(
     css,
@@ -73,13 +79,13 @@ test("search selection lists use the quiet custom scrollbar", () => {
   );
   assert.match(
     css,
-    /\.search-results::-webkit-scrollbar,[\s\S]*?\.episode-choice-list::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;/,
-    "Search selection lists should use narrow WebKit scrollbars"
+    /\.episode-choice-list::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;/,
+    "Episode choices should use a narrow WebKit scrollbar"
   );
   assert.match(
     css,
-    /\.search-results::-webkit-scrollbar-button,[\s\S]*?\.episode-choice-list::-webkit-scrollbar-button\s*\{[\s\S]*?display:\s*none;/,
-    "Search selection lists should hide default WebKit scrollbar arrow buttons"
+    /\.episode-choice-list::-webkit-scrollbar-button\s*\{[\s\S]*?display:\s*none;/,
+    "Episode choices should hide default WebKit scrollbar arrow buttons"
   );
 });
 
@@ -103,8 +109,8 @@ test("search result covers use the larger six-result layout", () => {
 
   assert.match(
     css,
-    /\.search-results:has\(> button:nth-child\(6\)\)\s*\{[\s\S]*?grid-template-rows:\s*repeat\(6,\s*minmax\(96px,\s*1fr\)\);/,
-    "Search results should reserve space for six larger subject rows"
+    /\.search-results:has\(> button:nth-child\(6\)\)\s*\{[\s\S]*?grid-template-rows:\s*repeat\(6,\s*minmax\(83px,\s*1fr\)\);/,
+    "Search results should reserve space for six subject rows without requiring a scrollbar"
   );
   assert.match(
     css,
@@ -113,7 +119,7 @@ test("search result covers use the larger six-result layout", () => {
   );
   assert.match(
     css,
-    /\.search-result-cover\s*\{[\s\S]*?width:\s*58px;[\s\S]*?height:\s*78px;/,
+    /\.search-result-cover\s*\{[\s\S]*?width:\s*58px;[\s\S]*?height:\s*66px;/,
     "Search result covers should be large enough to identify subjects"
   );
 });

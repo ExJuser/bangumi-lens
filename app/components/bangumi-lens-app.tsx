@@ -1607,6 +1607,7 @@ export default function BangumiLensApp() {
   const [refreshingSearchResults, setRefreshingSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchPagination, setSearchPagination] = useState<SearchPagination | null>(null);
+  const [searchKeywordDraft, setSearchKeywordDraft] = useState("");
   const [searchPageInput, setSearchPageInput] = useState("");
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
@@ -2829,6 +2830,7 @@ export default function BangumiLensApp() {
         total: typeof payload.total === "number" ? payload.total : results.length,
         hasNext: Boolean(payload.hasNext)
       });
+      setSearchKeywordDraft(query);
     } catch (caught) {
       if (!isPagingCurrentSearch) {
         setSearchPagination(null);
@@ -2994,6 +2996,14 @@ export default function BangumiLensApp() {
   function refreshCurrentSearchResults() {
     if (!searchPagination || searching) return;
     void searchByTitle(searchPagination.query, searchPagination.page, { refresh: true });
+  }
+
+  function submitSearchKeyword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextKeyword = searchKeywordDraft.trim();
+    if (!nextKeyword || searching) return;
+
+    void searchByTitle(nextKeyword, 1);
   }
 
   function selectSearchEpisode(episode: SearchEpisodeChoice) {
@@ -3833,10 +3843,28 @@ export default function BangumiLensApp() {
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="search-selection-head">
-              <div>
+              <div className="search-selection-title-block">
                 <span className="label">搜索结果</span>
                 <h2 id="search-selection-title">选择作品和章节</h2>
               </div>
+              {searchPagination ? (
+                <form className="search-keyword-editor" onSubmit={submitSearchKeyword}>
+                  <div className="search-keyword-control">
+                    <Search size={16} />
+                    <input
+                      id="search-keyword-input"
+                      aria-label="搜索关键词"
+                      value={searchKeywordDraft}
+                      onChange={(event) => setSearchKeywordDraft(event.target.value)}
+                      disabled={searching}
+                      placeholder="输入作品关键词"
+                    />
+                    <button type="submit" disabled={searching || !searchKeywordDraft.trim()}>
+                      重新搜索
+                    </button>
+                  </div>
+                </form>
+              ) : null}
               <div className="search-selection-actions">
                 {searchPagination ? (
                   <button
