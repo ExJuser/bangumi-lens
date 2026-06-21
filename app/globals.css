@@ -1805,6 +1805,43 @@ input {
   padding-top: 10px;
 }
 
+.season-trend-chart-compact {
+  grid-auto-flow: row;
+  grid-auto-columns: initial;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-content: center;
+  align-items: stretch;
+  height: 170px;
+  overflow: hidden;
+  padding-top: 0;
+}
+
+.season-trend-point-stat {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  min-height: 92px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 16px;
+}
+
+.season-trend-point-stat span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-trend-point-stat strong {
+  color: var(--accent-dark);
+  font-size: 30px;
+  line-height: 1;
+}
+
 .season-trend-bar {
   display: grid;
   grid-template-rows: minmax(0, 1fr) 18px;

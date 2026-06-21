@@ -102,3 +102,14 @@ test("season report generation progress is scoped to the current subject", () =>
   assert.match(source, /setSeasonReportGeneration\(\(current\) => \(current && current\.subjectKey !== currentSubjectKey \? null : current\)\)/);
   assert.match(source, /generation=\{visibleSeasonReportGeneration\}/);
 });
+
+test("season trend charts use compact stats for one or two saved reports", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(source, /const useCompactPoints = episodes\.length <= 2/);
+  assert.match(source, /season-trend-chart-compact/);
+  assert.match(source, /season-trend-point-stat/);
+  assert.match(css, /\.season-trend-chart-compact/);
+  assert.match(css, /\.season-trend-point-stat/);
+});

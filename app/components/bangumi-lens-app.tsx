@@ -686,6 +686,27 @@ function SeasonTrendBars({
 }) {
   const values = episodes.map((episode) => Number(episode[valueKey]) || 0);
   const maxValue = Math.max(...values, 1);
+  const useCompactPoints = episodes.length <= 2;
+
+  if (useCompactPoints) {
+    return (
+      <div className="season-trend-chart season-trend-chart-compact" aria-label={label}>
+        {episodes.map((episode) => {
+          const value = Number(episode[valueKey]) || 0;
+          return (
+            <div
+              className="season-trend-point-stat"
+              key={`${label}-${episode.id}`}
+              title={`${episode.label} ${formatTrendNumber(value, digits)}`}
+            >
+              <span>{episode.label}</span>
+              <strong>{formatTrendNumber(value, digits)}</strong>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="season-trend-chart" aria-label={label}>
