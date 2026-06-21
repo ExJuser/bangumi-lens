@@ -312,10 +312,10 @@ async function readLogs() {
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1080,
+    width: 1120,
     height: 760,
-    minWidth: 880,
-    minHeight: 600,
+    resizable: false,
+    maximizable: false,
     title: "Bangumi Lens Controller",
     backgroundColor: "#f6f3ee",
     autoHideMenuBar: true,
