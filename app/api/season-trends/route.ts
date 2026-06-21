@@ -7,6 +7,8 @@ import { buildSeasonTrendPayload } from "@/lib/season-trends";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type SubjectInfoPayload = Awaited<ReturnType<typeof fetchBangumiSubjectInfo>>;
+
 export async function GET(request: Request) {
   const startedAt = Date.now();
   const searchParams = new URL(request.url).searchParams;
@@ -21,7 +23,7 @@ export async function GET(request: Request) {
   try {
     const [history, subjectInfo] = await Promise.all([
       readHistory(),
-      subjectId ? fetchBangumiSubjectInfo(subjectId) : Promise.resolve({})
+      subjectId ? fetchBangumiSubjectInfo(subjectId) : Promise.resolve({} as SubjectInfoPayload)
     ]);
     const trends = buildSeasonTrendPayload(history, subjectId, subjectName, {
       episodeTotal: subjectInfo.episodeTotal

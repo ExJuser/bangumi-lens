@@ -1154,11 +1154,13 @@ function getHeroEpisodeTitleTranslation(meta: Report["meta"], translationState?:
 function HeroEpisodeTitle({
   meta,
   translationState,
-  onRequestTranslation
+  onRequestTranslation,
+  onOpenAiConfirmation
 }: {
   meta: Report["meta"];
   translationState?: EpisodeTitleTranslationState;
   onRequestTranslation: (meta: Report["meta"], allowAi: boolean) => void;
+  onOpenAiConfirmation: (meta: Report["meta"]) => void;
 }) {
   const title = getHeroEpisodeTitle(meta);
   const translation = getHeroEpisodeTitleTranslation(meta, translationState);
@@ -1185,7 +1187,19 @@ function HeroEpisodeTitle({
         ) : translation?.status === "needs-ai" ? (
           <>
             <strong>Bangumi 官方暂无中文名</strong>
-            <em>确认后可调用模型 API 翻译</em>
+            <em>可手动调用模型 API 翻译，确认前不会产生费用</em>
+            <button
+              type="button"
+              className="hero-title-translation-action"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onOpenAiConfirmation(meta);
+              }}
+            >
+              <Sparkles size={14} />
+              AI 翻译
+            </button>
           </>
         ) : translation?.status === "error" ? (
           <>
@@ -1225,11 +1239,13 @@ function getHeroSubjectTitleTranslation(meta: Report["meta"], translationState?:
 function HeroSubjectTitle({
   meta,
   translationState,
-  onRequestTranslation
+  onRequestTranslation,
+  onOpenAiConfirmation
 }: {
   meta: Report["meta"];
   translationState?: EpisodeTitleTranslationState;
   onRequestTranslation: (meta: Report["meta"], allowAi: boolean) => void;
+  onOpenAiConfirmation: (meta: Report["meta"]) => void;
 }) {
   const title = getHeroSubjectTitle(meta);
   const translation = getHeroSubjectTitleTranslation(meta, translationState);
@@ -1256,7 +1272,19 @@ function HeroSubjectTitle({
         ) : translation?.status === "needs-ai" ? (
           <>
             <strong>Bangumi 官方暂无中文名</strong>
-            <em>确认后可调用模型 API 翻译</em>
+            <em>可手动调用模型 API 翻译，确认前不会产生费用</em>
+            <button
+              type="button"
+              className="hero-title-translation-action"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onOpenAiConfirmation(meta);
+              }}
+            >
+              <Sparkles size={14} />
+              AI 翻译
+            </button>
           </>
         ) : translation?.status === "error" ? (
           <>
@@ -2402,10 +2430,6 @@ export default function BangumiLensApp() {
 
     const existingState = subjectTitleTranslations[meta.subjectId];
     if (!allowAi && existingState?.status === "needs-ai") {
-      setPendingAiSubjectTitleTranslation({
-        subjectId: meta.subjectId,
-        title: meta.subjectTitle
-      });
       return;
     }
 
@@ -2456,10 +2480,6 @@ export default function BangumiLensApp() {
           ...current,
           [meta.subjectId as string]: { status: "needs-ai" }
         }));
-        setPendingAiSubjectTitleTranslation({
-          subjectId: meta.subjectId,
-          title: meta.subjectTitle
-        });
       }
     } catch (caught) {
       setSubjectTitleTranslations((current) => ({
@@ -2472,17 +2492,18 @@ export default function BangumiLensApp() {
     }
   }, [subjectTitleTranslations]);
 
+  function openAiSubjectTitleTranslationConfirmation(meta: Report["meta"]) {
+    if (!meta.subjectId || !meta.subjectTitle?.trim()) return;
+    setPendingAiSubjectTitleTranslation({
+      subjectId: meta.subjectId,
+      title: meta.subjectTitle
+    });
+  }
+
   const requestEpisodeTitleTranslation = useCallback(async (meta: Report["meta"], allowAi: boolean) => {
     if (!allowAi && meta.episodeTitleCn?.trim()) return;
     const existingState = episodeTitleTranslations[meta.episodeId];
     if (!allowAi && existingState?.status === "needs-ai") {
-      setPendingAiTitleTranslation({
-        episodeId: meta.episodeId,
-        title: meta.title,
-        subjectTitle: meta.subjectTitle,
-        subjectTitleCn: meta.subjectTitleCn,
-        episodeNumber: meta.episodeNumber
-      });
       return;
     }
 
@@ -2536,13 +2557,6 @@ export default function BangumiLensApp() {
           ...current,
           [meta.episodeId]: { status: "needs-ai" }
         }));
-        setPendingAiTitleTranslation({
-          episodeId: meta.episodeId,
-          title: meta.title,
-          subjectTitle: meta.subjectTitle,
-          subjectTitleCn: meta.subjectTitleCn,
-          episodeNumber: meta.episodeNumber
-        });
       }
     } catch (caught) {
       setEpisodeTitleTranslations((current) => ({
@@ -2554,6 +2568,16 @@ export default function BangumiLensApp() {
       }));
     }
   }, [episodeTitleTranslations]);
+
+  function openAiTitleTranslationConfirmation(meta: Report["meta"]) {
+    setPendingAiTitleTranslation({
+      episodeId: meta.episodeId,
+      title: meta.title,
+      subjectTitle: meta.subjectTitle,
+      subjectTitleCn: meta.subjectTitleCn,
+      episodeNumber: meta.episodeNumber
+    });
+  }
 
   function confirmAiTitleTranslation() {
     if (!pendingAiTitleTranslation || !report) return;
@@ -3244,11 +3268,13 @@ export default function BangumiLensApp() {
                 meta={report.meta}
                 translationState={report.meta.subjectId ? subjectTitleTranslations[report.meta.subjectId] : undefined}
                 onRequestTranslation={requestSubjectTitleTranslation}
+                onOpenAiConfirmation={openAiSubjectTitleTranslationConfirmation}
               />
               <HeroEpisodeTitle
                 meta={report.meta}
                 translationState={episodeTitleTranslations[report.meta.episodeId]}
                 onRequestTranslation={requestEpisodeTitleTranslation}
+                onOpenAiConfirmation={openAiTitleTranslationConfirmation}
               />
               {reportGeneratedAtLabel ? (
                 <p className="hero-report-meta">

@@ -26,7 +26,8 @@ function hasCurrentCacheSchema(subjectInfo: CachedSubjectInfoPayload | undefined
 
 function isEpisodeTotalConsistent(subjectInfo: SubjectInfoPayload | undefined) {
   if (!subjectInfo || typeof subjectInfo.episodeTotal !== "number" || !hasEpisodeList(subjectInfo)) return true;
-  return subjectInfo.episodes.every(
+  const episodes = subjectInfo.episodes || [];
+  return episodes.every(
     (episode) => typeof episode.sort !== "number" || episode.sort <= subjectInfo.episodeTotal!
   );
 }

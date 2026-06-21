@@ -13,7 +13,7 @@ test("history route effect does not reopen the stale route during a pending clie
   );
   assert.match(
     source,
-    /pendingRouteReportIdRef\.current = item\.id;[\s\S]*?router\.(?:replace|push)\(route\);/,
+    /pendingRouteReportIdRef\.current = getRouteItemId\(route\);[\s\S]*?router\.(?:replace|push)\(route\);/,
     "Opening a saved report should mark the route switch before pushing a new route"
   );
   assert.match(

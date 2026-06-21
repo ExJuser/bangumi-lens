@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import { fetchBangumiSubjectTitleCn } from "@/lib/bangumi";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { translateSubjectTitle } from "@/lib/report";
+import { readServerCache, writeServerCache } from "@/lib/server-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type TranslationSource = "official" | "ai";
+type CachedTranslation = {
+  translation: string;
+  source: TranslationSource;
+};
+
+const AI_TRANSLATION_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 type TranslationRequest = {
   subjectId?: unknown;
@@ -32,6 +39,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ translation: officialTitle, source: "official" satisfies TranslationSource });
     }
 
+    const cached = await readServerCache<CachedTranslation>(
+      "subject-translation",
+      subjectId,
+      AI_TRANSLATION_CACHE_MAX_AGE_MS
+    );
+    if (cached?.translation) {
+      await logTranslationComplete(cached.source, subjectId, startedAt, true);
+      return NextResponse.json({ translation: cached.translation, source: cached.source });
+    }
+
     if (!allowAi) {
       await appendAppLog("info", "subject_translation.official.empty", {
         subjectId,
@@ -41,6 +58,10 @@ export async function POST(request: Request) {
     }
 
     const translation = await translateSubjectTitle({ title });
+    await writeServerCache<CachedTranslation>("subject-translation", subjectId, {
+      translation,
+      source: "ai"
+    });
 
     await logTranslationComplete("ai", subjectId, startedAt);
     return NextResponse.json({ translation, source: "ai" satisfies TranslationSource });
@@ -56,10 +77,11 @@ export async function POST(request: Request) {
   }
 }
 
-async function logTranslationComplete(source: TranslationSource, subjectId: string, startedAt: number) {
+async function logTranslationComplete(source: TranslationSource, subjectId: string, startedAt: number, cached = false) {
   await appendAppLog("info", "subject_translation.complete", {
     subjectId,
     source,
+    cached,
     durationMs: Date.now() - startedAt
   });
 }

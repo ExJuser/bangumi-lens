@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import { fetchBangumiEpisodeTitleCn } from "@/lib/bangumi";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { translateEpisodeTitle } from "@/lib/report";
+import { readServerCache, writeServerCache } from "@/lib/server-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type TranslationSource = "official" | "ai";
+type CachedTranslation = {
+  translation: string;
+  source: TranslationSource;
+};
+
+const AI_TRANSLATION_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 type TranslationRequest = {
   episodeId?: unknown;
@@ -35,6 +42,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ translation: officialTitle, source: "official" satisfies TranslationSource });
     }
 
+    const cached = await readServerCache<CachedTranslation>(
+      "episode-translation",
+      episodeId,
+      AI_TRANSLATION_CACHE_MAX_AGE_MS
+    );
+    if (cached?.translation) {
+      await logTranslationComplete(cached.source, episodeId, startedAt, true);
+      return NextResponse.json({ translation: cached.translation, source: cached.source });
+    }
+
     if (!allowAi) {
       await appendAppLog("info", "episode_translation.official.empty", {
         episodeId,
@@ -48,6 +65,10 @@ export async function POST(request: Request) {
       subjectTitle: typeof body.subjectTitle === "string" ? body.subjectTitle : undefined,
       subjectTitleCn: typeof body.subjectTitleCn === "string" ? body.subjectTitleCn : undefined,
       episodeNumber: typeof body.episodeNumber === "number" ? body.episodeNumber : undefined
+    });
+    await writeServerCache<CachedTranslation>("episode-translation", episodeId, {
+      translation,
+      source: "ai"
     });
 
     await logTranslationComplete("ai", episodeId, startedAt);
@@ -64,10 +85,11 @@ export async function POST(request: Request) {
   }
 }
 
-async function logTranslationComplete(source: TranslationSource, episodeId: string, startedAt: number) {
+async function logTranslationComplete(source: TranslationSource, episodeId: string, startedAt: number, cached = false) {
   await appendAppLog("info", "episode_translation.complete", {
     episodeId,
     source,
+    cached,
     durationMs: Date.now() - startedAt
   });
 }
