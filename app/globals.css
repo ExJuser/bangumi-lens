@@ -1123,7 +1123,8 @@ input {
   grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
   width: min(920px, 100%);
-  max-height: min(760px, calc(100vh - 48px));
+  height: min(760px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
@@ -2740,6 +2741,7 @@ input {
   }
 
   .search-selection-modal {
+    height: calc(100vh - 32px);
     max-height: calc(100vh - 32px);
     padding: 18px;
   }
