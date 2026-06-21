@@ -320,6 +320,8 @@ type SearchEpisodeChoice = EpisodeAvailabilitySignals & {
   url: string;
 };
 
+const NO_SEARCH_EPISODES_MESSAGE = "这个条目暂时没有可选择的正片章节。";
+
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
 
 const BANGUMI_EPISODE_PATH = /^\/ep\/(\d+)\/?$/;
@@ -2802,10 +2804,11 @@ export default function BangumiLensApp() {
     void searchByTitle(trimmedUrl);
   }
 
-  async function selectSearchResult(result: SearchResult) {
+  async function selectSearchResult(result: SearchResult, options: { refresh?: boolean } = {}) {
     const requestSeq = searchEpisodeRequestSeqRef.current + 1;
     searchEpisodeRequestSeqRef.current = requestSeq;
     const isCurrentRequest = () => searchEpisodeRequestSeqRef.current === requestSeq;
+    const refresh = Boolean(options.refresh);
 
     setSearchSelectionError("");
     setSelectedSearchResult(result);
@@ -2815,14 +2818,16 @@ export default function BangumiLensApp() {
     setLoadingSearchEpisodes(false);
 
     try {
-      const cachedInfo = result.subjectInfo || subjectInfoById[result.subjectId];
+      const cachedInfo = refresh ? undefined : result.subjectInfo || subjectInfoById[result.subjectId];
       let subjectInfo = cachedInfo;
 
       if (!Array.isArray(subjectInfo?.episodes)) {
         if (isCurrentRequest()) {
           setLoadingSearchEpisodes(true);
         }
-        const response = await fetch(`/api/subject-info?subjectId=${encodeURIComponent(result.subjectId)}`, {
+        const params = new URLSearchParams({ subjectId: result.subjectId });
+        if (refresh) params.set("refresh", "1");
+        const response = await fetch(`/api/subject-info?${params.toString()}`, {
           cache: "no-store"
         });
         const payload = (await response.json()) as SubjectInfo & { error?: string };
@@ -2831,6 +2836,11 @@ export default function BangumiLensApp() {
         }
         subjectInfo = payload;
         setSubjectInfoById((current) => ({ ...current, [result.subjectId]: payload }));
+        if (refresh) {
+          setSearchResults((current) =>
+            current.map((item) => (item.subjectId === result.subjectId ? { ...item, subjectInfo: payload } : item))
+          );
+        }
       }
 
       if (subjectInfo) {
@@ -2842,9 +2852,9 @@ export default function BangumiLensApp() {
         .map((episode) => ({
           ...episode,
           url: buildSearchEpisodeUrl(episode.id)
-        }));
+      }));
       if (episodes.length === 0) {
-        throw new Error("这个条目暂时没有可选择的正片章节。");
+        throw new Error(NO_SEARCH_EPISODES_MESSAGE);
       }
 
       if (isCurrentRequest()) {
@@ -2859,6 +2869,11 @@ export default function BangumiLensApp() {
         setLoadingSearchEpisodes(false);
       }
     }
+  }
+
+  function refreshSelectedSearchResult() {
+    if (!selectedSearchResult || loadingSearchEpisodes) return;
+    void selectSearchResult(selectedSearchResult, { refresh: true });
   }
 
   function selectSearchEpisode(episode: SearchEpisodeChoice) {
@@ -3683,16 +3698,24 @@ export default function BangumiLensApp() {
                 </div>
                 {selectedSearchResult ? (
                   <div className="episode-choice-panel" aria-label="章节选择">
+                    {searchSelectionError === NO_SEARCH_EPISODES_MESSAGE ? (
+                      <button className="episode-choice-panel-refresh" type="button" onClick={refreshSelectedSearchResult}>
+                        <RefreshCw size={14} />
+                        手动刷新
+                      </button>
+                    ) : null}
                     {loadingSearchEpisodes ? (
                       <p className="episode-choice-loading">
                         <Loader2 className="spin" size={16} />
                         正在加载章节列表
                       </p>
                     ) : searchSelectionError ? (
-                      <p className="episode-choice-error">
-                        <AlertCircle size={17} />
-                        {searchSelectionError}
-                      </p>
+                      <div className="episode-choice-error">
+                        <div className="episode-choice-error-message">
+                          <AlertCircle size={17} />
+                          <span>{searchSelectionError}</span>
+                        </div>
+                      </div>
                     ) : (
                       <>
                         <div className="episode-choice-toolbar">

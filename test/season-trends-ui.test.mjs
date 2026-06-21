@@ -128,7 +128,34 @@ test("title search stores subject info returned with search results", () => {
   assert.match(searchBody, /const subjectInfoEntries = results/);
   assert.match(searchBody, /result is SearchResult & \{ subjectInfo: SubjectInfo \}/);
   assert.match(searchBody, /setSubjectInfoById\(\(current\) => \(\{ \.\.\.current, \.\.\.Object\.fromEntries\(subjectInfoEntries\) \}\)\)/);
-  assert.match(selectionBody, /const cachedInfo = result\.subjectInfo \|\| subjectInfoById\[result\.subjectId\]/);
+  assert.match(selectionBody, /const cachedInfo = refresh \? undefined : result\.subjectInfo \|\| subjectInfoById\[result\.subjectId\]/);
+});
+
+test("empty episode picker state offers a manual refresh", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const selectionBody = source.slice(
+    source.indexOf("async function selectSearchResult"),
+    source.indexOf("function selectSearchEpisode")
+  );
+  const refreshBody = source.slice(
+    source.indexOf("function refreshSelectedSearchResult"),
+    source.indexOf("function selectSearchEpisode")
+  );
+
+  assert.match(source, /const NO_SEARCH_EPISODES_MESSAGE = "这个条目暂时没有可选择的正片章节。"/);
+  assert.match(selectionBody, /options: \{ refresh\?: boolean \} = \{\}/);
+  assert.match(selectionBody, /const cachedInfo = refresh \? undefined : result\.subjectInfo \|\| subjectInfoById\[result\.subjectId\]/);
+  assert.match(selectionBody, /if \(refresh\) params\.set\("refresh", "1"\)/);
+  assert.match(selectionBody, /throw new Error\(NO_SEARCH_EPISODES_MESSAGE\)/);
+  assert.match(refreshBody, /selectSearchResult\(selectedSearchResult, \{ refresh: true \}\)/);
+  assert.match(source, /searchSelectionError === NO_SEARCH_EPISODES_MESSAGE/);
+  assert.match(source, /className="episode-choice-panel-refresh"/);
+  assert.match(source, /className="episode-choice-error-message"/);
+  assert.match(source, /手动刷新/);
+  assert.match(source, /RefreshCw size=\{14\}/);
+  assert.match(css, /\.episode-choice-panel \{\s*position: relative;/);
+  assert.match(css, /\.episode-choice-panel-refresh \{\s*position: absolute;[\s\S]*?top: 12px;[\s\S]*?right: 12px;/);
 });
 
 test("episode picker search only matches titles and exact arabic episode numbers", () => {

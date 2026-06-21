@@ -17,7 +17,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
-  const subjectId = new URL(request.url).searchParams.get("subjectId")?.trim();
+  const searchParams = new URL(request.url).searchParams;
+  const subjectId = searchParams.get("subjectId")?.trim();
+  const refresh = searchParams.get("refresh") === "1";
 
   if (!subjectId) {
     await appendAppLog("warn", "subject-info.request.invalid", { reason: "missing_subject_id" });
@@ -31,6 +33,7 @@ export async function GET(request: Request) {
       SUBJECT_INFO_CACHE_TTL_MS
     );
     if (
+      !refresh &&
       cached &&
       hasCurrentSubjectInfoCacheSchema(cached) &&
       hasSubjectInfoEpisodeListField(cached) &&
@@ -43,7 +46,7 @@ export async function GET(request: Request) {
       return NextResponse.json(cached);
     }
 
-    await appendAppLog("info", "subject-info.request.start", { subjectId });
+    await appendAppLog("info", "subject-info.request.start", { subjectId, refresh });
     const subjectInfo = await fetchBangumiSubjectInfo(subjectId, { includeEpisodes: true });
     await writeServerCache(SUBJECT_INFO_CACHE_NAMESPACE, subjectId, {
       ...subjectInfo,

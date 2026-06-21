@@ -58,3 +58,11 @@ test("search API attaches cached empty subject episode lists to results", () => 
   assert.match(source, /await attachCachedSubjectInfo\(cached\.results\)/);
   assert.match(source, /await attachCachedSubjectInfo\(diskCached\)/);
 });
+
+test("subject info API can refresh cached empty episode lists", () => {
+  const source = readFileSync(join(process.cwd(), "app", "api", "subject-info", "route.ts"), "utf8");
+
+  assert.match(source, /const refresh = searchParams\.get\("refresh"\) === "1"/);
+  assert.match(source, /!refresh &&\s*cached &&/);
+  assert.match(source, /subjectId, refresh/);
+});
