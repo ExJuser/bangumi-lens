@@ -788,11 +788,11 @@ input {
 
 .search-results span,
 .search-results strong {
+  display: block;
   min-width: 0;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-results span {
@@ -801,7 +801,6 @@ input {
   font-size: 15px;
   font-weight: 850;
   line-height: 1.3;
-  -webkit-line-clamp: 2;
 }
 
 .search-results strong {
@@ -809,17 +808,18 @@ input {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
-  -webkit-line-clamp: 1;
 }
 
 .search-results em {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
+  min-width: 52px;
   color: var(--muted);
   font-size: 13px;
   font-style: normal;
   font-weight: 800;
+  text-align: right;
   white-space: nowrap;
 }
 
@@ -1016,7 +1016,7 @@ input {
 
 .episode-choice-row {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
+  grid-template-columns: 16px minmax(0, 1fr) 82px;
   gap: 10px;
   align-items: start;
   height: auto;
@@ -1074,9 +1074,11 @@ input {
 }
 
 .episode-choice-title {
-  display: block;
-  max-height: none;
-  overflow: visible;
+  display: -webkit-box;
+  max-height: calc(1.35em * 2);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .episode-choice-list > button span {
