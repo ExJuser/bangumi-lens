@@ -139,8 +139,42 @@ test("title search keeps dialog mounted while changing result pages", () => {
   );
 
   assert.match(searchBody, /const isPagingCurrentSearch =/);
-  assert.match(searchBody, /if \(!isPagingCurrentSearch\) \{\s*setSearchResults\(\[\]\);\s*setSearchPagination\(null\);/);
+  assert.match(searchBody, /if \(!isPagingCurrentSearch && !keepSelectionOpen\) \{\s*setSearchResults\(\[\]\);\s*setSearchPagination\(null\);/);
   assert.match(source, /function goToSearchPage\(page: number\)/);
+});
+
+test("title search keeps dialog mounted while resubmitting a keyword inside the dialog", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const searchBody = source.slice(
+    source.indexOf("async function searchByTitle"),
+    source.indexOf("useEffect", source.indexOf("async function searchByTitle"))
+  );
+  const submitBody = source.slice(
+    source.indexOf("function submitSearchKeyword"),
+    source.indexOf("function selectSearchEpisode")
+  );
+
+  assert.match(searchBody, /keepSelectionOpen\?: boolean/);
+  assert.match(searchBody, /const keepSelectionOpen = Boolean\(options\.keepSelectionOpen\)/);
+  assert.match(searchBody, /if \(!isPagingCurrentSearch && !keepSelectionOpen\) \{\s*setSearchResults\(\[\]\);\s*setSearchPagination\(null\);/);
+  assert.match(submitBody, /searchByTitle\(nextKeyword, 1, \{ keepSelectionOpen: true \}\)/);
+});
+
+test("search result covers show a large hover preview", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const selectionBody = source.slice(
+    source.indexOf("{searchResults.map((result) => ("),
+    source.indexOf("{searchPagination ? (", source.indexOf("{searchResults.map((result) => ("))
+  );
+
+  assert.match(source, /type SearchCoverPreview =/);
+  assert.match(source, /const \[searchCoverPreview, setSearchCoverPreview\] = useState<SearchCoverPreview \| null>\(null\)/);
+  assert.match(source, /function positionSearchCoverPreview\(result: SearchResult, target: HTMLElement\)/);
+  assert.match(selectionBody, /onMouseEnter=\{\(event\) => showSearchCoverPreview\(result, event\)\}/);
+  assert.match(selectionBody, /onFocus=\{\(event\) => showSearchCoverPreview\(result, event\)\}/);
+  assert.match(selectionBody, /onMouseLeave=\{hideSearchCoverPreview\}/);
+  assert.match(source, /className="search-cover-preview"/);
+  assert.match(source, /getSearchResultTitle\(searchCoverPreview\.result\)/);
 });
 
 test("empty episode picker state offers a manual refresh", () => {
@@ -201,7 +235,7 @@ test("search selection dialog shows and resubmits the current keyword", () => {
   assert.match(source, /aria-label="搜索关键词"/);
   assert.match(source, />\s*搜索\s*</);
   assert.match(submitBody, /searchKeywordDraft\.trim\(\)/);
-  assert.match(submitBody, /searchByTitle\(nextKeyword, 1\)/);
+  assert.match(submitBody, /searchByTitle\(nextKeyword, 1, \{ keepSelectionOpen: true \}\)/);
   assert.doesNotMatch(submitBody, /resetResults/);
   assert.match(css, /\.search-selection-head\s*\{[\s\S]*?grid-template-columns:\s*minmax\(220px,\s*1fr\) minmax\(320px,\s*452px\) minmax\(180px,\s*1fr\);/);
   assert.match(css, /\.search-keyword-control\s*\{/);

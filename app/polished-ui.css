@@ -1532,6 +1532,40 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   color: var(--danger);
 }
 
+:root[data-ui="polished"] .toast-notice {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 60;
+  width: min(520px, calc(100vw - 48px));
+  margin: 0;
+}
+
+:root[data-ui="polished"] .toast-notice span {
+  min-width: 0;
+  line-height: 1.6;
+}
+
+:root[data-ui="polished"] .toast-notice button {
+  display: inline-grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  margin: -4px -4px 0 auto;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+:root[data-ui="polished"] .toast-notice button:hover,
+:root[data-ui="polished"] .toast-notice button:focus-visible {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  outline: none;
+}
+
 :root[data-ui="polished"] .loading-panel h2 {
   margin: 0 0 4px;
   font-size: 19px;
@@ -3082,6 +3116,13 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   :root[data-ui="polished"] .input-row button, :root[data-ui="polished"] .source-link-button {
     flex-basis: auto;
     width: 100%;
+  }
+
+  :root[data-ui="polished"] .toast-notice {
+    top: 12px;
+    right: 12px;
+    width: calc(100vw - 24px);
+    padding: 14px;
   }
 
   :root[data-ui="polished"] .preview-grid, :root[data-ui="polished"] .recent-shortcut-list {

@@ -124,6 +124,26 @@ test("search result covers use the larger six-result layout", () => {
   );
 });
 
+test("search result cover preview floats outside the scroll list", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(
+    css,
+    /\.search-cover-preview\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?z-index:\s*52;/,
+    "Large cover preview should float above the modal instead of being clipped by the scroll list"
+  );
+  assert.match(
+    css,
+    /\.search-cover-preview\s*\{[\s\S]*?width:\s*220px;[\s\S]*?height:\s*320px;/,
+    "Large cover preview should use a readable poster size"
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 560px\)[\s\S]*?\.search-cover-preview\s*\{[\s\S]*?display:\s*none;/,
+    "Large cover preview should not cover the mobile picker"
+  );
+});
+
 test("history action buttons stay above non-interactive metadata", () => {
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
   const historyItemLabelRule = css.match(/\.history-item-label\s*\{[^}]*\}/)?.[0] || "";

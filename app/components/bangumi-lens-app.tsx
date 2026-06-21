@@ -29,7 +29,17 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { flushSync } from "react-dom";
 import { getEpisodeAvailabilityWarning, type EpisodeAvailabilityWarning } from "@/lib/episode-availability";
 import type { EpisodeAvailabilitySignals } from "@/lib/types";
@@ -321,6 +331,12 @@ type SearchResult = {
   url: string;
 };
 
+type SearchCoverPreview = {
+  result: SearchResult;
+  left: number;
+  top: number;
+};
+
 type SearchPagination = {
   query: string;
   page: number;
@@ -335,6 +351,8 @@ type SearchEpisodeChoice = EpisodeAvailabilitySignals & {
 
 const NO_SEARCH_EPISODES_MESSAGE = "这个条目暂时没有可选择的正片章节。";
 const SEARCH_EPISODE_PAGE_SIZE = 8;
+const SEARCH_COVER_PREVIEW_WIDTH = 220;
+const SEARCH_COVER_PREVIEW_HEIGHT = 320;
 
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
 
@@ -1614,6 +1632,7 @@ export default function BangumiLensApp() {
   const [searchKeywordDraft, setSearchKeywordDraft] = useState("");
   const [searchPageInput, setSearchPageInput] = useState("");
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+  const [searchCoverPreview, setSearchCoverPreview] = useState<SearchCoverPreview | null>(null);
   const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
   const [searchEpisodeQuery, setSearchEpisodeQuery] = useState("");
   const [searchEpisodePage, setSearchEpisodePage] = useState(1);
@@ -1910,7 +1929,15 @@ export default function BangumiLensApp() {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        closeSearchSelectionDialog();
+        setSearchCoverPreview(null);
+        setSearchResults([]);
+        setSearchPagination(null);
+        setSelectedSearchResult(null);
+        setSearchEpisodes([]);
+        setSearchEpisodeQuery("");
+        setSelectedSearchEpisodeIds(new Set());
+        setSearchSelectionError("");
+        setLoadingSearchEpisodes(false);
       }
     }
 
@@ -2778,13 +2805,14 @@ export default function BangumiLensApp() {
     void runAnalysis(trimmedUrl);
   }, [history, runAnalysis]);
 
-  async function searchByTitle(query: string, page = 1, options: { refresh?: boolean } = {}) {
+  async function searchByTitle(query: string, page = 1, options: { refresh?: boolean; keepSelectionOpen?: boolean } = {}) {
     const refresh = Boolean(options.refresh);
+    const keepSelectionOpen = Boolean(options.keepSelectionOpen);
     const isPagingCurrentSearch =
       searchPagination && normalizeSearchText(searchPagination.query) === normalizeSearchText(query);
 
     setError("");
-    if (!isPagingCurrentSearch) {
+    if (!isPagingCurrentSearch && !keepSelectionOpen) {
       setSearchResults([]);
       setSearchPagination(null);
     }
@@ -2836,7 +2864,7 @@ export default function BangumiLensApp() {
       });
       setSearchKeywordDraft(query);
     } catch (caught) {
-      if (!isPagingCurrentSearch) {
+      if (!isPagingCurrentSearch && !keepSelectionOpen) {
         setSearchPagination(null);
       }
       setError(caught instanceof Error ? caught.message : "搜索失败，请稍后重试。");
@@ -2910,6 +2938,7 @@ export default function BangumiLensApp() {
     if (!trimmedUrl) return;
 
     if (isBangumiEpisodeUrl(trimmedUrl)) {
+      hideSearchCoverPreview();
       setSearchResults([]);
       setSearchPagination(null);
       setSelectedSearchResult(null);
@@ -2931,6 +2960,7 @@ export default function BangumiLensApp() {
     const refresh = Boolean(options.refresh);
 
     setSearchSelectionError("");
+    hideSearchCoverPreview();
     setSelectedSearchResult(result);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
@@ -2999,7 +3029,40 @@ export default function BangumiLensApp() {
 
   function refreshCurrentSearchResults() {
     if (!searchPagination || searching) return;
+    hideSearchCoverPreview();
     void searchByTitle(searchPagination.query, searchPagination.page, { refresh: true });
+  }
+
+  function positionSearchCoverPreview(result: SearchResult, target: HTMLElement) {
+    if (!result.coverUrl) {
+      setSearchCoverPreview(null);
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const gap = 12;
+    const margin = 16;
+    const availableRight = viewportWidth - rect.right - gap - margin;
+    const left =
+      availableRight >= SEARCH_COVER_PREVIEW_WIDTH
+        ? rect.right + gap
+        : Math.max(margin, rect.left - gap - SEARCH_COVER_PREVIEW_WIDTH);
+    const top = Math.min(
+      Math.max(margin, rect.top + rect.height / 2 - SEARCH_COVER_PREVIEW_HEIGHT / 2),
+      Math.max(margin, viewportHeight - SEARCH_COVER_PREVIEW_HEIGHT - margin)
+    );
+
+    setSearchCoverPreview({ result, left, top });
+  }
+
+  function showSearchCoverPreview(result: SearchResult, event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>) {
+    positionSearchCoverPreview(result, event.currentTarget);
+  }
+
+  function hideSearchCoverPreview() {
+    setSearchCoverPreview(null);
   }
 
   function submitSearchKeyword(event: FormEvent<HTMLFormElement>) {
@@ -3007,10 +3070,12 @@ export default function BangumiLensApp() {
     const nextKeyword = searchKeywordDraft.trim();
     if (!nextKeyword || searching) return;
 
-    void searchByTitle(nextKeyword, 1);
+    hideSearchCoverPreview();
+    void searchByTitle(nextKeyword, 1, { keepSelectionOpen: true });
   }
 
   function selectSearchEpisode(episode: SearchEpisodeChoice) {
+    hideSearchCoverPreview();
     setSearchResults([]);
     setSearchPagination(null);
     setSelectedSearchResult(null);
@@ -3219,6 +3284,7 @@ export default function BangumiLensApp() {
   }
 
   function closeSearchSelectionDialog() {
+    hideSearchCoverPreview();
     setSearchResults([]);
     setSearchPagination(null);
     setSelectedSearchResult(null);
@@ -3231,6 +3297,7 @@ export default function BangumiLensApp() {
 
   function goToSearchPage(page: number) {
     if (!searchPagination || searching || page < 1) return;
+    hideSearchCoverPreview();
     void searchByTitle(searchPagination.query, page);
   }
 
@@ -3572,9 +3639,12 @@ export default function BangumiLensApp() {
       </section>
 
       {error ? (
-        <section className="notice error">
+        <section className="notice error toast-notice" role="alert">
           <AlertCircle size={20} />
           <span>{error}</span>
+          <button type="button" onClick={() => setError("")} aria-label="关闭提示">
+            <X size={16} />
+          </button>
         </section>
       ) : null}
 
@@ -3593,7 +3663,7 @@ export default function BangumiLensApp() {
         </section>
       ) : null}
 
-      {!loading && !report && !error ? (
+      {!loading && !report ? (
         <section className="empty-dashboard" aria-label="报告预览">
           <div className="empty-dashboard-head">
             <div>
@@ -3898,7 +3968,14 @@ export default function BangumiLensApp() {
                       className={selectedSearchResult?.subjectId === result.subjectId ? "selected" : ""}
                       key={`${result.subjectId}-${result.firstEpisodeId}`}
                       type="button"
-                      onClick={() => selectSearchResult(result)}
+                      onBlur={hideSearchCoverPreview}
+                      onClick={() => {
+                        hideSearchCoverPreview();
+                        void selectSearchResult(result);
+                      }}
+                      onFocus={(event) => showSearchCoverPreview(result, event)}
+                      onMouseEnter={(event) => showSearchCoverPreview(result, event)}
+                      onMouseLeave={hideSearchCoverPreview}
                     >
                       <span className="search-result-cover" aria-hidden="true">
                         {result.coverUrl ? <Image alt="" src={result.coverUrl} fill sizes="58px" unoptimized /> : null}
@@ -4138,6 +4215,22 @@ export default function BangumiLensApp() {
                 )}
               </section>
             </div>
+            {searchCoverPreview?.result.coverUrl ? (
+              <div
+                className="search-cover-preview"
+                style={{ left: searchCoverPreview.left, top: searchCoverPreview.top }}
+                aria-hidden="true"
+              >
+                <Image
+                  alt=""
+                  src={searchCoverPreview.result.coverUrl}
+                  fill
+                  sizes={`${SEARCH_COVER_PREVIEW_WIDTH}px`}
+                  unoptimized
+                />
+                <span>{getSearchResultTitle(searchCoverPreview.result)}</span>
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}

@@ -895,6 +895,40 @@ input {
   white-space: nowrap;
 }
 
+.search-cover-preview {
+  position: fixed;
+  z-index: 52;
+  width: 220px;
+  height: 320px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 8px;
+  background: var(--field);
+  box-shadow: 0 16px 48px rgba(36, 24, 12, 0.24);
+  pointer-events: none;
+}
+
+.search-cover-preview img {
+  object-fit: cover;
+}
+
+.search-cover-preview span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  overflow: hidden;
+  background: linear-gradient(180deg, transparent, rgba(20, 16, 12, 0.82) 42%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.35;
+  padding: 34px 12px 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .episode-choice-panel {
   position: relative;
   display: grid;
@@ -1576,6 +1610,41 @@ input {
 .error {
   border-color: rgba(204, 61, 61, 0.35);
   color: var(--accent-dark);
+}
+
+.toast-notice {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 60;
+  width: min(520px, calc(100vw - 48px));
+  margin: 0;
+  background: var(--panel);
+}
+
+.toast-notice span {
+  min-width: 0;
+  line-height: 1.6;
+}
+
+.toast-notice button {
+  display: inline-grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  margin: -4px -4px 0 auto;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+.toast-notice button:hover,
+.toast-notice button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  outline: none;
 }
 
 .loading-panel h2 {
@@ -3089,6 +3158,13 @@ input {
     width: 100%;
   }
 
+  .toast-notice {
+    top: 12px;
+    right: 12px;
+    width: calc(100vw - 24px);
+    padding: 14px;
+  }
+
   .preview-grid,
   .recent-shortcut-list {
     grid-template-columns: 1fr;
@@ -3134,6 +3210,10 @@ input {
 
   .episode-choice-list {
     max-height: 320px;
+  }
+
+  .search-cover-preview {
+    display: none;
   }
 
   .search-results:has(> button:nth-child(6)) {
