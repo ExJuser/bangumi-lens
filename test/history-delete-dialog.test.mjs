@@ -46,3 +46,16 @@ test("clear all local content is tucked behind a history title icon and confirma
   assert.match(cssSource, /\.history-clear\s*\{[\s\S]*?opacity:\s*0;/);
   assert.match(cssSource, /\.history-title:hover\s+\.history-clear/);
 });
+
+test("clear all local content reports success or failure after the request finishes", () => {
+  const pagePath = join(process.cwd(), "app", "components", "bangumi-lens-app.tsx");
+  const cssPath = join(process.cwd(), "app", "globals.css");
+  const pageSource = readFileSync(pagePath, "utf8");
+  const cssSource = readFileSync(cssPath, "utf8");
+
+  assert.match(pageSource, /const \[notice, setNotice\] = useState\(""\)/);
+  assert.match(pageSource, /setNotice\("已清空全部报告和缓存。"\)/);
+  assert.match(pageSource, /setError\("清空失败，请稍后重试。"\)/);
+  assert.match(pageSource, /className="notice success toast-notice"/);
+  assert.match(cssSource, /\.success\s*\{[\s\S]*?border-color:/);
+});

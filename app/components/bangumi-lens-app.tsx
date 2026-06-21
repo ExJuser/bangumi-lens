@@ -323,6 +323,7 @@ type SearchResult = {
   title: string;
   titleCn?: string;
   coverUrl?: string;
+  coverPreviewUrl?: string;
   episodeTotal?: number;
   subjectInfo?: SubjectInfo;
   firstEpisodeId: string;
@@ -353,6 +354,8 @@ const NO_SEARCH_EPISODES_MESSAGE = "这个条目暂时没有可选择的正片�
 const SEARCH_EPISODE_PAGE_SIZE = 8;
 const SEARCH_COVER_PREVIEW_WIDTH = 220;
 const SEARCH_COVER_PREVIEW_HEIGHT = 320;
+const SEARCH_COVER_PREVIEW_DELAY_MS = 500;
+const ERROR_TOAST_DURATION_MS = 5000;
 
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
 
@@ -1606,6 +1609,7 @@ export default function BangumiLensApp() {
   const [url, setUrl] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [history, setHistory] = useState<SavedReport[]>([]);
@@ -1663,6 +1667,7 @@ export default function BangumiLensApp() {
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
   const searchEpisodeRequestSeqRef = useRef(0);
+  const searchCoverPreviewTimeoutRef = useRef<number | null>(null);
   const currentSubjectKey = report ? getSubjectKey(report) : "";
   const summaryRoute = isSummaryPath(pathname);
   const visibleSeasonReportGeneration =
@@ -1773,6 +1778,16 @@ export default function BangumiLensApp() {
       document.body.style.overflow = previousOverflow;
     };
   }, [modalOpen]);
+
+  useEffect(() => {
+    if (!error) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setError((currentError) => (currentError === error ? "" : currentError));
+    }, ERROR_TOAST_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [error]);
 
   useEffect(() => {
     setSelectedSearchEpisodeIds((current) => {
@@ -1910,6 +1925,10 @@ export default function BangumiLensApp() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pendingAutoAnalyzeUrl]);
+
+  useEffect(() => {
+    return () => clearSearchCoverPreviewDelay();
+  }, []);
 
   useEffect(() => {
     if (!pendingSearchEpisodeGeneration) return;
@@ -2192,6 +2211,8 @@ export default function BangumiLensApp() {
   function confirmClearHistory() {
     const previousHistory = history;
     setClearHistoryPrompt(false);
+    setNotice("");
+    setError("");
     setHistory([]);
     setCollapsedSubjects(new Set());
     setReport(null);
@@ -2214,11 +2235,16 @@ export default function BangumiLensApp() {
         const payload = (await response.json()) as { history?: SavedReport[] };
         if (!response.ok) {
           setHistory(previousHistory);
+          setError("清空失败，请稍后重试。");
           return;
         }
         if (payload.history) setHistory(payload.history);
+        setNotice("已清空全部报告和缓存。");
       })
-      .catch(() => setHistory(previousHistory));
+      .catch(() => {
+        setHistory(previousHistory);
+        setError("清空失败，请稍后重试。");
+      });
   }
 
   function confirmLikeHistoryItem() {
@@ -3034,7 +3060,7 @@ export default function BangumiLensApp() {
   }
 
   function positionSearchCoverPreview(result: SearchResult, target: HTMLElement) {
-    if (!result.coverUrl) {
+    if (!result.coverPreviewUrl && !result.coverUrl) {
       setSearchCoverPreview(null);
       return;
     }
@@ -3057,11 +3083,29 @@ export default function BangumiLensApp() {
     setSearchCoverPreview({ result, left, top });
   }
 
+  function clearSearchCoverPreviewDelay() {
+    if (searchCoverPreviewTimeoutRef.current !== null) {
+      window.clearTimeout(searchCoverPreviewTimeoutRef.current);
+      searchCoverPreviewTimeoutRef.current = null;
+    }
+  }
+
   function showSearchCoverPreview(result: SearchResult, event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>) {
+    clearSearchCoverPreviewDelay();
     positionSearchCoverPreview(result, event.currentTarget);
   }
 
+  function scheduleSearchCoverPreview(result: SearchResult, event: ReactMouseEvent<HTMLElement>) {
+    clearSearchCoverPreviewDelay();
+    const target = event.currentTarget;
+    searchCoverPreviewTimeoutRef.current = window.setTimeout(() => {
+      searchCoverPreviewTimeoutRef.current = null;
+      positionSearchCoverPreview(result, target);
+    }, SEARCH_COVER_PREVIEW_DELAY_MS);
+  }
+
   function hideSearchCoverPreview() {
+    clearSearchCoverPreviewDelay();
     setSearchCoverPreview(null);
   }
 
@@ -3648,6 +3692,16 @@ export default function BangumiLensApp() {
         </section>
       ) : null}
 
+      {notice ? (
+        <section className="notice success toast-notice" role="status">
+          <Sparkles size={20} />
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice("")} aria-label="关闭提示">
+            <X size={16} />
+          </button>
+        </section>
+      ) : null}
+
       {loading ? (
         <section className="loading-panel">
           <Loader2 className="spin" size={28} />
@@ -3934,7 +3988,7 @@ export default function BangumiLensApp() {
                       placeholder="输入作品关键词"
                     />
                     <button type="submit" disabled={searching || !searchKeywordDraft.trim()}>
-                      搜索
+                      {searching ? "搜索中" : "搜索"}
                     </button>
                   </div>
                 </form>
@@ -3968,13 +4022,14 @@ export default function BangumiLensApp() {
                       className={selectedSearchResult?.subjectId === result.subjectId ? "selected" : ""}
                       key={`${result.subjectId}-${result.firstEpisodeId}`}
                       type="button"
+                      disabled={searching}
                       onBlur={hideSearchCoverPreview}
                       onClick={() => {
                         hideSearchCoverPreview();
                         void selectSearchResult(result);
                       }}
                       onFocus={(event) => showSearchCoverPreview(result, event)}
-                      onMouseEnter={(event) => showSearchCoverPreview(result, event)}
+                      onMouseEnter={(event) => scheduleSearchCoverPreview(result, event)}
                       onMouseLeave={hideSearchCoverPreview}
                     >
                       <span className="search-result-cover" aria-hidden="true">
@@ -4134,6 +4189,17 @@ export default function BangumiLensApp() {
                                   <label className="episode-choice-title" htmlFor={episodeInputId}>
                                     {getEpisodeChoiceLabel(episode)}
                                   </label>
+                                  <a
+                                    className="episode-choice-bangumi-link"
+                                    href={episode.url}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                    title="打开 Bangumi 章节页"
+                                    aria-label={`打开 Bangumi 章节页：${getEpisodeChoiceLabel(episode)}`}
+                                  >
+                                    <ExternalLink size={13} />
+                                    Bangumi
+                                  </a>
                                   <span className="episode-choice-meta">
                                     <strong>{saved ? "已有报告" : "未生成"}</strong>
                                     <em>{getEpisodeAirdateLabel(episode)}</em>
@@ -4215,7 +4281,7 @@ export default function BangumiLensApp() {
                 )}
               </section>
             </div>
-            {searchCoverPreview?.result.coverUrl ? (
+            {searchCoverPreview && (searchCoverPreview.result.coverPreviewUrl || searchCoverPreview.result.coverUrl) ? (
               <div
                 className="search-cover-preview"
                 style={{ left: searchCoverPreview.left, top: searchCoverPreview.top }}
@@ -4223,7 +4289,7 @@ export default function BangumiLensApp() {
               >
                 <Image
                   alt=""
-                  src={searchCoverPreview.result.coverUrl}
+                  src={searchCoverPreview.result.coverPreviewUrl ?? searchCoverPreview.result.coverUrl ?? ""}
                   fill
                   sizes={`${SEARCH_COVER_PREVIEW_WIDTH}px`}
                   unoptimized

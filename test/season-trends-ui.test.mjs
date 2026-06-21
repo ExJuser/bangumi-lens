@@ -168,12 +168,18 @@ test("search result covers show a large hover preview", () => {
   );
 
   assert.match(source, /type SearchCoverPreview =/);
+  assert.match(source, /coverPreviewUrl\?: string/);
+  assert.match(source, /const SEARCH_COVER_PREVIEW_DELAY_MS = 500/);
   assert.match(source, /const \[searchCoverPreview, setSearchCoverPreview\] = useState<SearchCoverPreview \| null>\(null\)/);
+  assert.match(source, /const searchCoverPreviewTimeoutRef = useRef<number \| null>\(null\)/);
   assert.match(source, /function positionSearchCoverPreview\(result: SearchResult, target: HTMLElement\)/);
-  assert.match(selectionBody, /onMouseEnter=\{\(event\) => showSearchCoverPreview\(result, event\)\}/);
+  assert.match(source, /function scheduleSearchCoverPreview\(result: SearchResult, event: ReactMouseEvent<HTMLElement>\)/);
+  assert.match(source, /window\.setTimeout\(\(\) => \{[\s\S]*?positionSearchCoverPreview\(result, target\);[\s\S]*?\}, SEARCH_COVER_PREVIEW_DELAY_MS\)/);
+  assert.match(selectionBody, /onMouseEnter=\{\(event\) => scheduleSearchCoverPreview\(result, event\)\}/);
   assert.match(selectionBody, /onFocus=\{\(event\) => showSearchCoverPreview\(result, event\)\}/);
   assert.match(selectionBody, /onMouseLeave=\{hideSearchCoverPreview\}/);
   assert.match(source, /className="search-cover-preview"/);
+  assert.match(source, /src=\{searchCoverPreview\.result\.coverPreviewUrl \?\? searchCoverPreview\.result\.coverUrl \?\? ""\}/);
   assert.match(source, /getSearchResultTitle\(searchCoverPreview\.result\)/);
 });
 
@@ -233,10 +239,16 @@ test("search selection dialog shows and resubmits the current keyword", () => {
   assert.match(source, /className="search-keyword-editor"/);
   assert.match(source, /id="search-keyword-input"/);
   assert.match(source, /aria-label="搜索关键词"/);
-  assert.match(source, />\s*搜索\s*</);
+  assert.match(source, /\{searching \? "搜索中" : "搜索"\}/);
+  assert.match(source, /disabled=\{searching \|\| !searchKeywordDraft\.trim\(\)\}/);
   assert.match(submitBody, /searchKeywordDraft\.trim\(\)/);
   assert.match(submitBody, /searchByTitle\(nextKeyword, 1, \{ keepSelectionOpen: true \}\)/);
   assert.doesNotMatch(submitBody, /resetResults/);
+  assert.match(source, /className="secondary-action search-selection-refresh"[\s\S]*?disabled=\{searching\}/);
+  assert.match(source, /onClick=\{\(\) => goToSearchPage\(searchPagination\.page - 1\)\}[\s\S]*?disabled=\{!canGoPreviousSearchPage\}/);
+  assert.match(source, /onClick=\{\(\) => goToSearchPage\(searchPagination\.page \+ 1\)\}[\s\S]*?disabled=\{!canGoNextSearchPage\}/);
+  assert.match(source, /disabled=\{searching\}[\s\S]*?onBlur=\{submitSearchPageInput\}/);
+  assert.match(source, /key=\{`\$\{result\.subjectId\}-\$\{result\.firstEpisodeId\}`\}[\s\S]*?disabled=\{searching\}/);
   assert.match(css, /\.search-selection-head\s*\{[\s\S]*?grid-template-columns:\s*minmax\(220px,\s*1fr\) minmax\(320px,\s*452px\) minmax\(180px,\s*1fr\);/);
   assert.match(css, /\.search-keyword-control\s*\{/);
   assert.match(css, /\.search-keyword-control input\s*\{[\s\S]*?font-size:\s*16px;/);
@@ -256,6 +268,20 @@ test("search selection dialog links back to the selected Bangumi subject", () =>
   assert.match(source, />\s*Bangumi\s*</);
   assert.match(css, /\.search-selection-column-status\s*\{/);
   assert.match(css, /\.bangumi-subject-link\s*\{[\s\S]*?text-decoration:\s*none;/);
+});
+
+test("episode picker links each episode back to Bangumi", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(source, /className="episode-choice-bangumi-link"/);
+  assert.match(source, /href=\{episode\.url\}/);
+  assert.match(source, /title="打开 Bangumi 章节页"/);
+  assert.match(source, /aria-label=\{`打开 Bangumi 章节页：\$\{getEpisodeChoiceLabel\(episode\)\}`\}/);
+  assert.match(source, /target="_blank"/);
+  assert.match(source, /rel="noreferrer"/);
+  assert.match(css, /\.episode-choice-row\s*\{[\s\S]*?grid-template-columns:\s*16px minmax\(0, 1fr\) auto 82px;/);
+  assert.match(css, /\.episode-choice-bangumi-link\s*\{[\s\S]*?text-decoration:\s*none;/);
 });
 
 test("episode picker paginates large episode lists and selects only the current page", () => {
