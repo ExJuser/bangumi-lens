@@ -355,6 +355,8 @@ const SEARCH_EPISODE_PAGE_SIZE = 8;
 const SEARCH_COVER_PREVIEW_WIDTH = 220;
 const SEARCH_COVER_PREVIEW_HEIGHT = 320;
 const SEARCH_COVER_PREVIEW_DELAY_MS = 500;
+const SEARCH_SUGGESTION_DEBOUNCE_MS = 360;
+const SEARCH_SUGGESTION_CACHE_TTL_MS = 10 * 60 * 1000;
 const ERROR_TOAST_DURATION_MS = 5000;
 
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
@@ -1632,6 +1634,10 @@ export default function BangumiLensApp() {
   const [searching, setSearching] = useState(false);
   const [refreshingSearchResults, setRefreshingSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchResult[]>([]);
+  const [searchSuggestionsLoading, setSearchSuggestionsLoading] = useState(false);
+  const [searchSuggestionsError, setSearchSuggestionsError] = useState("");
+  const [searchSuggestionsFocused, setSearchSuggestionsFocused] = useState(false);
   const [searchPagination, setSearchPagination] = useState<SearchPagination | null>(null);
   const [searchKeywordDraft, setSearchKeywordDraft] = useState("");
   const [searchPageInput, setSearchPageInput] = useState("");
@@ -1666,6 +1672,11 @@ export default function BangumiLensApp() {
   const returningHomeRef = useRef(false);
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
+  const searchSuggestionRequestSeqRef = useRef(0);
+  const searchSuggestionAbortRef = useRef<AbortController | null>(null);
+  const searchSuggestionCacheRef = useRef(
+    new Map<string, { expiresAt: number; results: SearchResult[]; error: string }>()
+  );
   const searchEpisodeRequestSeqRef = useRef(0);
   const searchCoverPreviewTimeoutRef = useRef<number | null>(null);
   const currentSubjectKey = report ? getSubjectKey(report) : "";
@@ -1675,6 +1686,16 @@ export default function BangumiLensApp() {
   const visiblePendingSeasonReportGeneration =
     pendingSeasonReportGeneration?.subjectKey === currentSubjectKey ? pendingSeasonReportGeneration : null;
   const searchSelectionOpen = searchResults.length > 0 || Boolean(selectedSearchResult);
+  const normalizedUrlInput = url.trim();
+  const canLoadSearchSuggestions =
+    !loading &&
+    !searchSelectionOpen &&
+    !isBangumiEpisodeUrl(normalizedUrlInput) &&
+    normalizeSearchText(normalizedUrlInput).length >= 2;
+  const canShowSearchSuggestions =
+    searchSuggestionsFocused &&
+    canLoadSearchSuggestions &&
+    (searchSuggestionsLoading || searchSuggestions.length > 0 || Boolean(searchSuggestionsError));
   const searchResultCountLabel =
     searchPagination && searchPagination.total > 0
       ? `${searchPagination.total} 个结果，第 ${searchPagination.page} 页`
@@ -1764,6 +1785,7 @@ export default function BangumiLensApp() {
       if (reportSwitchingTimeoutRef.current !== null) {
         window.clearTimeout(reportSwitchingTimeoutRef.current);
       }
+      searchSuggestionAbortRef.current?.abort();
       seasonReportGenerationAbortRef.current?.abort();
     };
   }, []);
@@ -2838,6 +2860,8 @@ export default function BangumiLensApp() {
       searchPagination && normalizeSearchText(searchPagination.query) === normalizeSearchText(query);
 
     setError("");
+    setSearchSuggestions([]);
+    setSearchSuggestionsError("");
     if (!isPagingCurrentSearch && !keepSelectionOpen) {
       setSearchResults([]);
       setSearchPagination(null);
@@ -2901,6 +2925,81 @@ export default function BangumiLensApp() {
       }
     }
   }
+
+  useEffect(() => {
+    const normalizedQuery = normalizeSearchText(url);
+    searchSuggestionAbortRef.current?.abort();
+
+    if (!searchSuggestionsFocused || !canLoadSearchSuggestions) {
+      searchSuggestionRequestSeqRef.current += 1;
+      setSearchSuggestions([]);
+      setSearchSuggestionsLoading(false);
+      setSearchSuggestionsError("");
+      return;
+    }
+
+    const cached = searchSuggestionCacheRef.current.get(normalizedQuery);
+    if (cached && cached.expiresAt > Date.now()) {
+      searchSuggestionRequestSeqRef.current += 1;
+      setSearchSuggestions(cached.results);
+      setSearchSuggestionsError(cached.error);
+      setSearchSuggestionsLoading(false);
+      return;
+    }
+
+    const requestSeq = searchSuggestionRequestSeqRef.current + 1;
+    searchSuggestionRequestSeqRef.current = requestSeq;
+    const abortController = new AbortController();
+    searchSuggestionAbortRef.current = abortController;
+    setSearchSuggestionsLoading(true);
+    setSearchSuggestionsError("");
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q: normalizedQuery, page: "1" });
+        const response = await fetch(`/api/search?${params.toString()}`, {
+          cache: "no-store",
+          signal: abortController.signal
+        });
+        const payload = (await response.json()) as {
+          results?: SearchResult[];
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error || "搜索候选加载失败，请稍后重试。");
+        }
+
+        if (searchSuggestionRequestSeqRef.current !== requestSeq) return;
+        const results = (payload.results || []).slice(0, 5);
+        const subjectInfoEntries = results
+          .filter((result): result is SearchResult & { subjectInfo: SubjectInfo } => Boolean(result.subjectInfo))
+          .map((result) => [result.subjectId, result.subjectInfo] as const);
+        if (subjectInfoEntries.length > 0) {
+          setSubjectInfoById((current) => ({ ...current, ...Object.fromEntries(subjectInfoEntries) }));
+        }
+        searchSuggestionCacheRef.current.set(normalizedQuery, {
+          expiresAt: Date.now() + SEARCH_SUGGESTION_CACHE_TTL_MS,
+          results,
+          error: results.length === 0 ? "没有找到匹配的 Bangumi 条目。" : ""
+        });
+        setSearchSuggestions(results);
+        setSearchSuggestionsError(results.length === 0 ? "没有找到匹配的 Bangumi 条目。" : "");
+      } catch (caught) {
+        if (abortController.signal.aborted || searchSuggestionRequestSeqRef.current !== requestSeq) return;
+        setSearchSuggestions([]);
+        setSearchSuggestionsError(caught instanceof Error ? caught.message : "搜索候选加载失败，请稍后重试。");
+      } finally {
+        if (searchSuggestionRequestSeqRef.current === requestSeq) {
+          setSearchSuggestionsLoading(false);
+        }
+      }
+    }, SEARCH_SUGGESTION_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      abortController.abort();
+    };
+  }, [canLoadSearchSuggestions, searchSuggestionsFocused, url]);
 
   useEffect(() => {
     if (!historyLoaded || loading) return;
@@ -3109,6 +3208,19 @@ export default function BangumiLensApp() {
     setSearchCoverPreview(null);
   }
 
+  function focusSearchSuggestions() {
+    setSearchSuggestionsFocused(true);
+  }
+
+  function blurSearchSuggestions(event: ReactFocusEvent<HTMLElement>) {
+    const nextFocusedElement = event.relatedTarget;
+    if (nextFocusedElement instanceof Node && event.currentTarget.contains(nextFocusedElement)) return;
+
+    setSearchSuggestionsFocused(false);
+    searchSuggestionAbortRef.current?.abort();
+    setSearchSuggestionsLoading(false);
+  }
+
   function submitSearchKeyword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextKeyword = searchKeywordDraft.trim();
@@ -3116,6 +3228,24 @@ export default function BangumiLensApp() {
 
     hideSearchCoverPreview();
     void searchByTitle(nextKeyword, 1, { keepSelectionOpen: true });
+  }
+
+  function selectSearchSuggestion(result: SearchResult) {
+    const currentQuery = url.trim();
+    setUrl(getSearchResultTitle(result));
+    setSearchSuggestionsFocused(false);
+    setSearchResults(searchSuggestions);
+    setSearchPagination({
+      query: currentQuery,
+      page: 1,
+      pageSize: searchSuggestions.length,
+      total: searchSuggestions.length,
+      hasNext: false
+    });
+    setSearchKeywordDraft(currentQuery);
+    setSearchSuggestions([]);
+    setSearchSuggestionsError("");
+    void selectSearchResult(result);
   }
 
   function selectSearchEpisode(episode: SearchEpisodeChoice) {
@@ -3653,30 +3783,74 @@ export default function BangumiLensApp() {
 
         <form className="analyze-box" onSubmit={analyze}>
           <label htmlFor="episode-url">Bangumi 章节链接或作品名</label>
-          <div className="input-row">
-            <input
-              id="episode-url"
-              placeholder="输入作品名或 https://bgm.tv/ep/123456"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              disabled={loading || searching}
-            />
-            {bangumiSourceUrl ? (
-              <a className="source-link-button" href={bangumiSourceUrl} rel="noreferrer" target="_blank" title="打开 Bangumi 原页">
-                <ExternalLink size={18} />
-                <span>原页</span>
-              </a>
+          <div className="search-input-stack" onFocus={focusSearchSuggestions} onBlur={blurSearchSuggestions}>
+            <div className="input-row">
+              <input
+                id="episode-url"
+                placeholder="输入作品名或 https://bgm.tv/ep/123456"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                onFocus={focusSearchSuggestions}
+                disabled={loading || searching}
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-controls="search-suggestions"
+              />
+              {bangumiSourceUrl ? (
+                <a className="source-link-button" href={bangumiSourceUrl} rel="noreferrer" target="_blank" title="打开 Bangumi 原页">
+                  <ExternalLink size={18} />
+                  <span>原页</span>
+                </a>
+              ) : null}
+              <button disabled={loading || searching || !url.trim()} type="submit">
+                {loading || searching ? (
+                  <Loader2 className="spin" size={18} />
+                ) : isBangumiEpisodeUrl(url) ? (
+                  <ArrowRight size={18} />
+                ) : (
+                  <Search size={18} />
+                )}
+                <span>{loading ? "分析中" : searching ? "搜索中" : isBangumiEpisodeUrl(url) ? "生成" : "搜索"}</span>
+              </button>
+            </div>
+            {canShowSearchSuggestions ? (
+              <div className="search-suggestions" id="search-suggestions" role="listbox" aria-label="Bangumi 搜索候选">
+                {searchSuggestionsLoading && searchSuggestions.length === 0 ? (
+                  <div className="search-suggestion-status" role="status">
+                    <Loader2 className="spin" size={15} />
+                    <span>正在搜索候选...</span>
+                  </div>
+                ) : null}
+                {!searchSuggestionsLoading && searchSuggestionsError ? (
+                  <div className="search-suggestion-status muted" role="status">
+                    {searchSuggestionsError}
+                  </div>
+                ) : null}
+                {searchSuggestions.map((result) => (
+                  <button
+                    className="search-suggestion"
+                    key={result.subjectId}
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    onClick={() => selectSearchSuggestion(result)}
+                  >
+                    <span className="search-suggestion-cover" aria-hidden="true">
+                      {result.coverUrl ? (
+                        <Image src={result.coverUrl} alt="" width={34} height={46} unoptimized />
+                      ) : (
+                        <Search size={15} />
+                      )}
+                    </span>
+                    <span className="search-suggestion-text">
+                      <strong>{getSearchResultTitle(result)}</strong>
+                      <span>{getSearchResultSubtitle(result)}</span>
+                    </span>
+                    {typeof result.episodeTotal === "number" ? <em>{result.episodeTotal} 话</em> : null}
+                  </button>
+                ))}
+              </div>
             ) : null}
-            <button disabled={loading || searching || !url.trim()} type="submit">
-              {loading || searching ? (
-                <Loader2 className="spin" size={18} />
-              ) : isBangumiEpisodeUrl(url) ? (
-                <ArrowRight size={18} />
-              ) : (
-                <Search size={18} />
-              )}
-              <span>{loading ? "分析中" : searching ? "搜索中" : isBangumiEpisodeUrl(url) ? "生成" : "搜索"}</span>
-            </button>
           </div>
           <p className="hint">输入作品名会先搜索 Bangumi 条目；确认作品后再选择具体话数。已有本地报告会在选中章节后提示查看或重新生成。</p>
         </form>
