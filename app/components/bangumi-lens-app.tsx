@@ -217,11 +217,13 @@ function HoverScrollText({ className, text }: { className?: string; text: string
 }
 
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
+const UI_MODE_STORAGE_KEY = "bangumi-lens-ui-mode";
 const HOME_ROUTE = "/home";
 const REPORT_ROUTE_PREFIX = "/reports/";
 const SUMMARY_ROUTE_PREFIX = "/summary/";
 const REPORT_STALE_THRESHOLD_MS = 15 * 24 * 60 * 60 * 1000;
 type ThemeMode = "day" | "night";
+type UiMode = "classic" | "polished";
 type EpisodeDirection = "previous" | "next";
 type MissingEpisodePrompt = {
   direction: EpisodeDirection;
@@ -1584,6 +1586,7 @@ export default function BangumiLensApp() {
   const [streamingText, setStreamingText] = useState("");
   const [history, setHistory] = useState<SavedReport[]>([]);
   const [theme, setTheme] = useState<ThemeMode>("day");
+  const [uiMode, setUiMode] = useState<UiMode>("classic");
   const [pendingDuplicate, setPendingDuplicate] = useState<SavedReport | null>(null);
   const [pendingAutoAnalyzeUrl, setPendingAutoAnalyzeUrl] = useState("");
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
@@ -1829,8 +1832,17 @@ export default function BangumiLensApp() {
         setTheme(savedTheme);
         document.documentElement.dataset.theme = savedTheme;
       }
+
+      const savedUiMode = window.localStorage.getItem(UI_MODE_STORAGE_KEY);
+      if (savedUiMode === "classic" || savedUiMode === "polished") {
+        setUiMode(savedUiMode);
+        document.documentElement.dataset.ui = savedUiMode;
+      } else {
+        document.documentElement.dataset.ui = "classic";
+      }
     } catch {
-      // Theme loading is optional.
+      document.documentElement.dataset.ui = "classic";
+      // Preference loading is optional.
     }
   }, []);
 
@@ -1988,6 +2000,13 @@ export default function BangumiLensApp() {
     setTheme(nextTheme);
     document.documentElement.dataset.theme = nextTheme;
     window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  }
+
+  function toggleUiMode() {
+    const nextUiMode = uiMode === "classic" ? "polished" : "classic";
+    setUiMode(nextUiMode);
+    document.documentElement.dataset.ui = nextUiMode;
+    window.localStorage.setItem(UI_MODE_STORAGE_KEY, nextUiMode);
   }
 
   function goHome() {
@@ -3404,6 +3423,15 @@ export default function BangumiLensApp() {
         <button className="theme-toggle" type="button" onClick={toggleTheme}>
           {theme === "day" ? <Moon size={17} /> : <Sun size={17} />}
           <span>{theme === "day" ? "夜间模式" : "日间模式"}</span>
+        </button>
+        <button
+          aria-pressed={uiMode === "polished"}
+          className="ui-mode-toggle"
+          type="button"
+          onClick={toggleUiMode}
+        >
+          <Sparkles size={17} />
+          <span>{uiMode === "polished" ? "经典 UI" : "新版 UI"}</span>
         </button>
       </div>
       <section className={report ? "hero hero-report" : "hero"}>

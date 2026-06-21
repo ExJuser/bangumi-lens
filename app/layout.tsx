@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import BangumiLensApp from "./components/bangumi-lens-app";
 import "./globals.css";
+import "./polished-ui.css";
 
 export const metadata: Metadata = {
   title: "Bangumi Lens",
