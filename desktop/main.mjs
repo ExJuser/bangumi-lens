@@ -38,6 +38,22 @@ function normalizeCommandLine(value) {
   return String(value || "").toLowerCase().replaceAll("/", "\\");
 }
 
+function buildChildEnv() {
+  const env = {};
+  let pathValue = "";
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.toLowerCase() === "path") {
+      pathValue = pathValue ? `${pathValue}${path.delimiter}${value}` : value || "";
+      continue;
+    }
+    env[key] = value;
+  }
+
+  env.Path = pathValue || process.env.Path || process.env.PATH || "";
+  return env;
+}
+
 function isProjectProcess(commandLine) {
   const normalizedCommand = normalizeCommandLine(commandLine);
   const normalizedRoot = normalizeCommandLine(rootDir);
@@ -222,10 +238,10 @@ async function startServer() {
   const stdoutLog = createWriteStream(stdoutLogPath, { flags: "a" });
   const stderrLog = createWriteStream(stderrLogPath, { flags: "a" });
   childStartedAt = Date.now();
-  childProcess = spawn("npm.cmd", ["run", "dev"], {
+  childProcess = spawn("cmd.exe", ["/d", "/s", "/c", "npm.cmd run dev"], {
     cwd: rootDir,
     windowsHide: true,
-    env: process.env
+    env: buildChildEnv()
   });
 
   childProcess.stdout.pipe(stdoutLog);
@@ -297,17 +313,19 @@ async function readLogs() {
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1080,
-    height: 720,
+    height: 760,
     minWidth: 880,
     minHeight: 600,
     title: "Bangumi Lens Controller",
     backgroundColor: "#f6f3ee",
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
+  mainWindow.setMenuBarVisibility(false);
 
   const indexPath = path.join(__dirname, "index.html");
   try {

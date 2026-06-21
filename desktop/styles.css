@@ -27,16 +27,36 @@ body {
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 
+body::-webkit-scrollbar {
+  width: 10px;
+}
+
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 28%, transparent);
+  background-clip: padding-box;
+}
+
+body:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 42%, transparent);
+  background-clip: padding-box;
+}
+
 button {
   font: inherit;
 }
 
 .shell {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   width: min(1120px, calc(100% - 40px));
   margin: 0 auto;
-  padding: 28px 0;
+  padding: 26px 0;
 }
 
 .hero {
@@ -265,6 +285,14 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.log-panel {
+  padding-bottom: 14px;
+}
+
+.log-panel .section-head {
+  margin-bottom: 10px;
+}
+
 .logs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -282,18 +310,45 @@ dd {
 }
 
 pre {
-  height: 210px;
+  height: 184px;
   margin: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #24201c;
   color: #f3ece1;
-  padding: 12px;
+  padding: 12px 14px 12px 12px;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
   line-height: 1.55;
+  overflow-wrap: anywhere;
+  scrollbar-color: color-mix(in srgb, #f3ece1 38%, transparent) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   white-space: pre-wrap;
+  word-break: break-word;
+}
+
+pre::-webkit-scrollbar {
+  width: 8px;
+  height: 0;
+}
+
+pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+pre::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f3ece1 28%, transparent);
+  background-clip: padding-box;
+}
+
+pre:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, #f3ece1 46%, transparent);
+  background-clip: padding-box;
 }
 
 @media (max-width: 900px) {
