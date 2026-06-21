@@ -55,8 +55,22 @@ test("search API attaches cached empty subject episode lists to results", () => 
   assert.match(source, /readServerCache<CachedSubjectInfoPayload>\(\s*SUBJECT_INFO_CACHE_NAMESPACE/);
   assert.match(source, /hasSubjectInfoEpisodeListField\(cached\)/);
   assert.match(source, /subjectInfo: cached/);
-  assert.match(source, /await attachCachedSubjectInfo\(cached\.results\)/);
-  assert.match(source, /await attachCachedSubjectInfo\(diskCached\)/);
+  assert.match(source, /async function attachCachedSubjectInfoToPayload/);
+  assert.match(source, /await attachCachedSubjectInfoToPayload\(cached\.payload\)/);
+  assert.match(source, /await attachCachedSubjectInfoToPayload\(diskCached\)/);
+});
+
+test("search API requests paged Bangumi subjects and caches pages separately", () => {
+  const source = readFileSync(join(process.cwd(), "app", "api", "search", "route.ts"), "utf8");
+
+  assert.match(source, /const SEARCH_PAGE_SIZE = 8/);
+  assert.match(source, /const offset = \(page - 1\) \* SEARCH_PAGE_SIZE/);
+  assert.match(source, /search\/subjects\?limit=\$\{SEARCH_PAGE_SIZE\}&offset=\$\{offset\}/);
+  assert.match(source, /function buildSearchCacheKey/);
+  assert.match(source, /const cacheKey = buildSearchCacheKey\(normalizedQuery, page\)/);
+  assert.match(source, /readServerCache<SearchPayload>\(SEARCH_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS\)/);
+  assert.match(source, /writeServerCache\(SEARCH_CACHE_NAMESPACE, cacheKey, payload\)/);
+  assert.match(source, /hasNext: page \* SEARCH_PAGE_SIZE < total/);
 });
 
 test("subject info API can refresh cached empty episode lists", () => {

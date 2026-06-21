@@ -44,11 +44,20 @@ export type SearchResult = {
   url: string;
 };
 
+type SearchPayload = {
+  results: SearchResult[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasNext: boolean;
+};
+
 const USER_AGENT =
   "BangumiLens/0.1 (+https://github.com/local/bangumi-lens; public episode comment summarizer)";
+const SEARCH_PAGE_SIZE = 8;
 const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const SEARCH_CACHE_NAMESPACE = "bangumi-search";
-const cache = new Map<string, { expiresAt: number; results: SearchResult[] }>();
+const SEARCH_CACHE_NAMESPACE = "bangumi-search-v2";
+const cache = new Map<string, { expiresAt: number; payload: SearchPayload }>();
 
 function normalizeQuery(query: string) {
   return query.trim().replace(/\s+/g, " ").toLowerCase();
@@ -60,6 +69,15 @@ function getSubjectTitle(subject: BangumiSubject) {
 
 function getEpisodeTitle(episode: BangumiEpisode) {
   return episode.name_cn?.trim() || episode.name?.trim() || undefined;
+}
+
+function normalizePage(page: string | null) {
+  const parsedPage = Number(page);
+  return Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+}
+
+function buildSearchCacheKey(query: string, page: number) {
+  return `${query}::page=${page}::size=${SEARCH_PAGE_SIZE}`;
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | undefined> {
@@ -78,19 +96,26 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | undefi
   return (await response.json()) as T;
 }
 
-async function searchSubjects(query: string) {
-  const payload = await fetchJson<{ data?: BangumiSubject[] }>("https://api.bgm.tv/v0/search/subjects", {
-    method: "POST",
-    body: JSON.stringify({
-      keyword: query,
-      sort: "match",
-      filter: {
-        type: [2]
-      }
-    })
-  });
+async function searchSubjects(query: string, page: number) {
+  const offset = (page - 1) * SEARCH_PAGE_SIZE;
+  const payload = await fetchJson<{ data?: BangumiSubject[]; total?: number }>(
+    `https://api.bgm.tv/v0/search/subjects?limit=${SEARCH_PAGE_SIZE}&offset=${offset}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        keyword: query,
+        sort: "match",
+        filter: {
+          type: [2]
+        }
+      })
+    }
+  );
 
-  return (payload?.data || []).filter((subject) => subject.id).slice(0, 8);
+  return {
+    subjects: (payload?.data || []).filter((subject) => subject.id),
+    total: typeof payload?.total === "number" && payload.total >= 0 ? payload.total : 0
+  };
 }
 
 async function fetchFirstEpisode(subjectId: number) {
@@ -107,8 +132,8 @@ async function fetchFirstEpisode(subjectId: number) {
   })[0];
 }
 
-async function buildSearchResults(query: string) {
-  const subjects = await searchSubjects(query);
+async function buildSearchPayload(query: string, page: number): Promise<SearchPayload> {
+  const { subjects, total } = await searchSubjects(query, page);
   const results = await Promise.all(
     subjects.map(async (subject) => {
       if (!subject.id) return undefined;
@@ -130,7 +155,14 @@ async function buildSearchResults(query: string) {
     })
   );
 
-  return results.filter((result): result is SearchResult => Boolean(result));
+  const filteredResults = results.filter((result): result is SearchResult => Boolean(result));
+  return {
+    results: filteredResults,
+    total,
+    page,
+    pageSize: SEARCH_PAGE_SIZE,
+    hasNext: page * SEARCH_PAGE_SIZE < total
+  };
 }
 
 function isReusableSubjectInfoCache(cached: CachedSubjectInfoPayload | undefined) {
@@ -162,42 +194,55 @@ async function attachCachedSubjectInfo(results: SearchResult[]) {
   return enrichedResults;
 }
 
+async function attachCachedSubjectInfoToPayload(payload: SearchPayload) {
+  return {
+    ...payload,
+    results: await attachCachedSubjectInfo(payload.results)
+  };
+}
+
 export async function GET(request: Request) {
   const startedAt = Date.now();
-  const query = new URL(request.url).searchParams.get("q") || "";
+  const searchParams = new URL(request.url).searchParams;
+  const query = searchParams.get("q") || "";
   const normalizedQuery = normalizeQuery(query);
+  const page = normalizePage(searchParams.get("page"));
+  const cacheKey = buildSearchCacheKey(normalizedQuery, page);
 
   if (normalizedQuery.length < 2) {
     return NextResponse.json({ error: "搜索词至少需要 2 个字符。" }, { status: 400 });
   }
 
-  const cached = cache.get(normalizedQuery);
+  const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return NextResponse.json({ results: await attachCachedSubjectInfo(cached.results), cached: true });
+    return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(cached.payload)), cached: true });
   }
 
-  const diskCached = await readServerCache<SearchResult[]>(SEARCH_CACHE_NAMESPACE, normalizedQuery, SEARCH_CACHE_TTL_MS);
-  if (diskCached?.length) {
-    cache.set(normalizedQuery, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, results: diskCached });
-    return NextResponse.json({ results: await attachCachedSubjectInfo(diskCached), cached: true });
+  const diskCached = await readServerCache<SearchPayload>(SEARCH_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS);
+  if (diskCached?.results) {
+    cache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: diskCached });
+    return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(diskCached)), cached: true });
   }
 
   try {
     configureServerProxy();
-    await appendAppLog("info", "search.request.start", { query: normalizedQuery });
-    const results = await buildSearchResults(query.trim());
-    cache.set(normalizedQuery, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, results });
-    await writeServerCache(SEARCH_CACHE_NAMESPACE, normalizedQuery, results);
+    await appendAppLog("info", "search.request.start", { query: normalizedQuery, page });
+    const payload = await buildSearchPayload(query.trim(), page);
+    cache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload });
+    await writeServerCache(SEARCH_CACHE_NAMESPACE, cacheKey, payload);
     await appendAppLog("info", "search.request.complete", {
       query: normalizedQuery,
-      count: results.length,
+      page,
+      count: payload.results.length,
+      total: payload.total,
       durationMs: Date.now() - startedAt
     });
 
-    return NextResponse.json({ results: await attachCachedSubjectInfo(results), cached: false });
+    return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(payload)), cached: false });
   } catch (error) {
     await appendAppLog("error", "search.request.failed", {
       query: normalizedQuery,
+      page,
       ...errorFields(error),
       durationMs: Date.now() - startedAt
     });

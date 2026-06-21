@@ -131,6 +131,18 @@ test("title search stores subject info returned with search results", () => {
   assert.match(selectionBody, /const cachedInfo = refresh \? undefined : result\.subjectInfo \|\| subjectInfoById\[result\.subjectId\]/);
 });
 
+test("title search keeps dialog mounted while changing result pages", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const searchBody = source.slice(
+    source.indexOf("async function searchByTitle"),
+    source.indexOf("useEffect", source.indexOf("async function searchByTitle"))
+  );
+
+  assert.match(searchBody, /const isPagingCurrentSearch =/);
+  assert.match(searchBody, /if \(!isPagingCurrentSearch\) \{\s*setSearchResults\(\[\]\);\s*setSearchPagination\(null\);/);
+  assert.match(source, /function goToSearchPage\(page: number\)/);
+});
+
 test("empty episode picker state offers a manual refresh", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");

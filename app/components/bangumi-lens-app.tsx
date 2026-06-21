@@ -316,6 +316,14 @@ type SearchResult = {
   url: string;
 };
 
+type SearchPagination = {
+  query: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  hasNext: boolean;
+};
+
 type SearchEpisodeChoice = EpisodeAvailabilitySignals & {
   url: string;
 };
@@ -1587,6 +1595,7 @@ export default function BangumiLensApp() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchPagination, setSearchPagination] = useState<SearchPagination | null>(null);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
   const [searchEpisodeQuery, setSearchEpisodeQuery] = useState("");
@@ -1623,6 +1632,12 @@ export default function BangumiLensApp() {
   const visiblePendingSeasonReportGeneration =
     pendingSeasonReportGeneration?.subjectKey === currentSubjectKey ? pendingSeasonReportGeneration : null;
   const searchSelectionOpen = searchResults.length > 0 || Boolean(selectedSearchResult);
+  const searchResultCountLabel =
+    searchPagination && searchPagination.total > 0
+      ? `${searchPagination.total} 个结果，第 ${searchPagination.page} 页`
+      : `${searchResults.length} 个结果`;
+  const canGoPreviousSearchPage = Boolean(searchPagination && searchPagination.page > 1 && !searching);
+  const canGoNextSearchPage = Boolean(searchPagination?.hasNext && !searching);
   const modalOpen = Boolean(
     searchSelectionOpen ||
       pendingDuplicate ||
@@ -1959,6 +1974,7 @@ export default function BangumiLensApp() {
     setLoading(false);
     setStreamingText("");
     setSearchResults([]);
+    setSearchPagination(null);
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
@@ -2698,9 +2714,15 @@ export default function BangumiLensApp() {
     void runAnalysis(trimmedUrl);
   }, [history, runAnalysis]);
 
-  async function searchByTitle(query: string) {
+  async function searchByTitle(query: string, page = 1) {
+    const isPagingCurrentSearch =
+      searchPagination && normalizeSearchText(searchPagination.query) === normalizeSearchText(query);
+
     setError("");
-    setSearchResults([]);
+    if (!isPagingCurrentSearch) {
+      setSearchResults([]);
+      setSearchPagination(null);
+    }
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
@@ -2709,8 +2731,15 @@ export default function BangumiLensApp() {
     setSearching(true);
 
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
-      const payload = (await response.json()) as { results?: SearchResult[]; error?: string };
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&page=${page}`, { cache: "no-store" });
+      const payload = (await response.json()) as {
+        results?: SearchResult[];
+        total?: number;
+        page?: number;
+        pageSize?: number;
+        hasNext?: boolean;
+        error?: string;
+      };
       if (!response.ok) {
         throw new Error(payload.error || "搜索失败，请稍后重试。");
       }
@@ -2727,7 +2756,17 @@ export default function BangumiLensApp() {
         setSubjectInfoById((current) => ({ ...current, ...Object.fromEntries(subjectInfoEntries) }));
       }
       setSearchResults(results);
+      setSearchPagination({
+        query,
+        page: typeof payload.page === "number" ? payload.page : page,
+        pageSize: typeof payload.pageSize === "number" ? payload.pageSize : results.length,
+        total: typeof payload.total === "number" ? payload.total : results.length,
+        hasNext: Boolean(payload.hasNext)
+      });
     } catch (caught) {
+      if (!isPagingCurrentSearch) {
+        setSearchPagination(null);
+      }
       setError(caught instanceof Error ? caught.message : "搜索失败，请稍后重试。");
     } finally {
       setSearching(false);
@@ -2797,6 +2836,7 @@ export default function BangumiLensApp() {
 
     if (isBangumiEpisodeUrl(trimmedUrl)) {
       setSearchResults([]);
+      setSearchPagination(null);
       setSelectedSearchResult(null);
       setSearchEpisodes([]);
       setSearchEpisodeQuery("");
@@ -2882,6 +2922,7 @@ export default function BangumiLensApp() {
 
   function selectSearchEpisode(episode: SearchEpisodeChoice) {
     setSearchResults([]);
+    setSearchPagination(null);
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
@@ -2946,6 +2987,7 @@ export default function BangumiLensApp() {
 
     setPendingSearchEpisodeGeneration(null);
     setSearchResults([]);
+    setSearchPagination(null);
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
@@ -3081,12 +3123,18 @@ export default function BangumiLensApp() {
 
   function closeSearchSelectionDialog() {
     setSearchResults([]);
+    setSearchPagination(null);
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
     setSelectedSearchEpisodeIds(new Set());
     setSearchSelectionError("");
     setLoadingSearchEpisodes(false);
+  }
+
+  function goToSearchPage(page: number) {
+    if (!searchPagination || searching || page < 1) return;
+    void searchByTitle(searchPagination.query, page);
   }
 
   function useExistingReport() {
@@ -3674,7 +3722,7 @@ export default function BangumiLensApp() {
               <section className="search-selection-column" aria-label="作品选择">
                 <div className="search-selection-column-head">
                   <strong>作品</strong>
-                  <span>{searchResults.length} 个结果</span>
+                  <span>{searchResultCountLabel}</span>
                 </div>
                 <div className="search-results" aria-label="搜索结果">
                   {searchResults.map((result) => (
@@ -3690,6 +3738,29 @@ export default function BangumiLensApp() {
                     </button>
                   ))}
                 </div>
+                {searchPagination ? (
+                  <div className="search-pagination" aria-label="搜索结果分页">
+                    <button
+                      type="button"
+                      onClick={() => goToSearchPage(searchPagination.page - 1)}
+                      disabled={!canGoPreviousSearchPage}
+                    >
+                      <ChevronLeft size={14} />
+                      上一页
+                    </button>
+                    <span>
+                      {searching ? "加载中" : `${searchPagination.page} / ${Math.max(1, Math.ceil(searchPagination.total / searchPagination.pageSize))}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => goToSearchPage(searchPagination.page + 1)}
+                      disabled={!canGoNextSearchPage}
+                    >
+                      下一页
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                ) : null}
               </section>
               <section className="search-selection-column" aria-label="章节选择">
                 <div className="search-selection-column-head">
