@@ -1442,6 +1442,14 @@ input {
   font-weight: 850;
 }
 
+.search-selection-actions button:hover:not(:disabled),
+.search-selection-actions button:focus-visible:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: var(--selected);
+  color: var(--accent-dark);
+  outline: none;
+}
+
 .search-selection-refresh {
   display: inline-flex;
   align-items: center;

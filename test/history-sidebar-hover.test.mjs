@@ -104,6 +104,22 @@ test("search selection lists keep sparse results at content height", () => {
   );
 });
 
+test("search selection header actions expose hover feedback", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const polishedCss = readFileSync(join(process.cwd(), "app", "polished-ui.css"), "utf8");
+
+  assert.match(
+    css,
+    /\.search-selection-actions button:hover:not\(:disabled\),[\s\S]*?\.search-selection-actions button:focus-visible:not\(:disabled\)\s*\{[\s\S]*?background:\s*var\(--selected\);/,
+    "Search selection header buttons should have visible hover and keyboard focus feedback"
+  );
+  assert.match(
+    polishedCss,
+    /:root\[data-ui="polished"\] \.search-selection-actions button:hover:not\(:disabled\),[\s\S]*?:root\[data-ui="polished"\] \.search-selection-actions button:focus-visible:not\(:disabled\)\s*\{[\s\S]*?background:\s*var\(--selected\);/,
+    "Polished mode should preserve search selection header action hover feedback"
+  );
+});
+
 test("search result covers use the larger six-result layout", () => {
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
 

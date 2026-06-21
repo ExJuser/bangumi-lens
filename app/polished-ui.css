@@ -1376,6 +1376,13 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   font-weight: 850;
 }
 
+:root[data-ui="polished"] .search-selection-actions button:hover:not(:disabled),
+:root[data-ui="polished"] .search-selection-actions button:focus-visible:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: var(--selected);
+  color: var(--accent-dark);
+}
+
 :root[data-ui="polished"] .search-selection-grid {
   display: grid;
   grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.25fr);
