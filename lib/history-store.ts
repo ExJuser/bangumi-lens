@@ -205,6 +205,16 @@ export async function deleteHistoryReport(itemId: string) {
   return nextHistory;
 }
 
+export async function clearHistoryReports() {
+  await Promise.all([
+    rm(HISTORY_DIR, { recursive: true, force: true }),
+    rm(LEGACY_HISTORY_FILE, { force: true })
+  ]);
+  await ensureHistoryDir();
+  await writeHistoryIndex([]);
+  return [];
+}
+
 export async function updateHistoryReportLike(itemId: string, liked: boolean) {
   const currentHistory = await readHistoryIndex();
   let found = false;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  clearHistoryReports,
   deleteHistoryReport,
   readHistoryIndex,
   readHistoryReport,
@@ -73,7 +74,26 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const body = (await request.json()) as { id?: unknown };
+  const body = (await request.json()) as { id?: unknown; all?: unknown };
+  if (body.all === true) {
+    const startedAt = Date.now();
+
+    try {
+      const history = await clearHistoryReports();
+      await appendAppLog("info", "history.clear.complete", {
+        count: history.length,
+        durationMs: Date.now() - startedAt
+      });
+      return NextResponse.json({ history });
+    } catch (error) {
+      await appendAppLog("error", "history.clear.failed", {
+        ...errorFields(error),
+        durationMs: Date.now() - startedAt
+      });
+      throw error;
+    }
+  }
+
   if (typeof body.id !== "string") {
     await appendAppLog("warn", "history.delete.invalid", { reason: "missing_id" });
     return NextResponse.json({ error: "缺少历史记录 ID。" }, { status: 400 });

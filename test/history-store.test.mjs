@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, mkdir, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -142,6 +142,28 @@ test("history storage toggles liked episodes and carries the mark across regener
 
     const index = await readHistoryIndex();
     assert.equal(index[0].likedAt, undefined);
+  });
+});
+
+test("history storage can clear every report and legacy history file", async () => {
+  await withTempCwd(async (dir) => {
+    const { clearHistoryReports, readHistory, saveHistoryReport } = loadHistoryStore();
+
+    const firstReport = makeReport(21);
+    const secondReport = makeReport(22);
+    await saveHistoryReport(firstReport, firstReport.meta.url);
+    await saveHistoryReport(secondReport, secondReport.meta.url);
+    await mkdir(join(dir, "data"), { recursive: true });
+    await writeFile(join(dir, "data", "reports.json"), JSON.stringify([{ id: "legacy" }]), "utf8");
+
+    const history = await clearHistoryReports();
+
+    assert.deepEqual(history, []);
+    assert.equal((await readHistory()).length, 0);
+    assert.equal(existsSync(join(dir, "data", "reports.json")), false);
+    assert.deepEqual(await readdir(join(dir, "data", "reports", "items")), []);
+    const indexJson = JSON.parse(await readFile(join(dir, "data", "reports", "index.json"), "utf8"));
+    assert.deepEqual(indexJson, []);
   });
 });
 

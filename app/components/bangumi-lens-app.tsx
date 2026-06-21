@@ -1486,6 +1486,7 @@ export default function BangumiLensApp() {
   const [subjectTitleTranslations, setSubjectTitleTranslations] = useState<Record<string, EpisodeTitleTranslationState>>({});
   const [likeHistoryPrompt, setLikeHistoryPrompt] = useState<LikeHistoryPrompt | null>(null);
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
+  const [clearHistoryPrompt, setClearHistoryPrompt] = useState(false);
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -1530,6 +1531,7 @@ export default function BangumiLensApp() {
       pendingAiSubjectTitleTranslation ||
       missingEpisodePrompt ||
       deleteHistoryPrompt ||
+      clearHistoryPrompt ||
       likeHistoryPrompt
   );
 
@@ -1937,6 +1939,38 @@ export default function BangumiLensApp() {
     const itemId = deleteHistoryPrompt.id;
     setDeleteHistoryPrompt(null);
     deleteHistoryItem(itemId);
+  }
+
+  function confirmClearHistory() {
+    const previousHistory = history;
+    setClearHistoryPrompt(false);
+    setHistory([]);
+    setCollapsedSubjects(new Set());
+    setReport(null);
+    setStreamingText("");
+    setShowSeasonTrend(false);
+    setSeasonTrend(null);
+    setSeasonTrendError("");
+    setSeasonTrendAiSummary("");
+    setSeasonTrendAiSummaryError("");
+    loadedRouteReportIdRef.current = null;
+    pendingRouteReportIdRef.current = null;
+    router.push(HOME_ROUTE);
+
+    void fetch("/api/history", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true })
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as { history?: SavedReport[] };
+        if (!response.ok) {
+          setHistory(previousHistory);
+          return;
+        }
+        if (payload.history) setHistory(payload.history);
+      })
+      .catch(() => setHistory(previousHistory));
   }
 
   function confirmLikeHistoryItem() {
@@ -2796,6 +2830,17 @@ export default function BangumiLensApp() {
             <History size={18} />
             最近
           </span>
+          {history.length > 0 ? (
+            <button
+              className="history-clear"
+              type="button"
+              onClick={() => setClearHistoryPrompt(true)}
+              title="清空全部报告"
+              aria-label="清空全部报告"
+            >
+              <Trash2 size={16} />
+            </button>
+          ) : null}
         </div>
         {groupedHistory.length > 0 ? (
           <div className="history-groups">
@@ -3479,6 +3524,24 @@ export default function BangumiLensApp() {
           actions={[
             { label: "取消", onClick: () => setDeleteHistoryPrompt(null), className: "secondary-action" },
             { label: "删除", onClick: confirmDeleteHistoryItem, className: "primary-action" }
+          ]}
+        />
+      ) : null}
+      {clearHistoryPrompt ? (
+        <ConfirmDialog
+          titleId="clear-history-title"
+          icon={<Trash2 size={20} />}
+          label="清空历史"
+          title="确认清空全部本地报告？"
+          description={
+            <>
+              将删除本机保存的全部 {history.length} 份报告和历史索引。这个操作不会删除 Bangumi 上的内容，但本地报告无法从这里恢复。
+            </>
+          }
+          onClose={() => setClearHistoryPrompt(false)}
+          actions={[
+            { label: "取消", onClick: () => setClearHistoryPrompt(false), className: "secondary-action" },
+            { label: "清空全部报告", onClick: confirmClearHistory, className: "primary-action" }
           ]}
         />
       ) : null}

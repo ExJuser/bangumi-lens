@@ -30,3 +30,18 @@ test("current episode header actions ask for confirmation before mutating histor
     /onClick=\{\(\) => toggleReportLike\(currentSavedReport, !currentReportLiked\)\}/
   );
 });
+
+test("clear all reports is tucked behind a history title icon and confirmation dialog", () => {
+  const pagePath = join(process.cwd(), "app", "components", "bangumi-lens-app.tsx");
+  const cssPath = join(process.cwd(), "app", "globals.css");
+  const pageSource = readFileSync(pagePath, "utf8");
+  const cssSource = readFileSync(cssPath, "utf8");
+
+  assert.match(pageSource, /clearHistoryPrompt/);
+  assert.match(pageSource, /confirmClearHistory/);
+  assert.match(pageSource, /JSON\.stringify\(\{ all: true \}\)/);
+  assert.match(pageSource, /className="history-clear"/);
+  assert.match(pageSource, /title="确认清空全部本地报告？"/);
+  assert.match(cssSource, /\.history-clear\s*\{[\s\S]*?opacity:\s*0;/);
+  assert.match(cssSource, /\.history-title:hover\s+\.history-clear/);
+});

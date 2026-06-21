@@ -188,6 +188,32 @@ input {
   gap: 7px;
 }
 
+.history-clear {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.history-title:hover .history-clear,
+.history-title:focus-within .history-clear {
+  opacity: 1;
+}
+
+.history-clear:hover,
+.history-clear:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-dark);
+  outline: none;
+}
+
 .history-groups {
   display: grid;
   gap: 8px;
