@@ -78,7 +78,6 @@ public/
   bangumi-lens.user.js       # Bangumi 页面入口用户脚本
 scripts/
   dev-server.mjs             # 读取本地配置后启动 Next.js
-desktop/                     # Windows 桌面控制台，管理本地开发服务
 test/                        # node:test 测试
 data/                        # 本地报告和缓存，运行后生成
 logs/                        # 本地运行日志，运行后生成
@@ -114,9 +113,10 @@ BANGUMI_ACCESS_TOKEN=your-bangumi-access-token
 npm run dev
 ```
 
-也可以启动 Windows 桌面控制台，在窗口里启动、重启、停止服务并查看端口、进程号和日志：
+如需用图形界面统一启动、重启、停止本地服务并查看端口、进程号和日志，请使用上级目录的全局服务管理器：
 
 ```bash
+cd ..\service-manager
 npm run desktop
 ```
 
@@ -226,11 +226,6 @@ npm run dev
 
 启动 Next.js 开发服务器。
 
-```bash
-npm run desktop
-```
-
-打开 Windows 桌面控制台，用图形界面管理本地开发服务。
 
 ```bash
 npm run build

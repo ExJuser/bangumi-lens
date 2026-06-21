@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,7 @@ const rootDir = path.resolve(__dirname, "..");
 const configDir = path.join(rootDir, "config");
 const appConfigPath = path.join(configDir, "app.json");
 const localEnvPath = path.join(configDir, ".env.local");
+const nextCachePath = path.join(rootDir, ".next");
 
 function displayPath(filePath) {
   return path.relative(rootDir, filePath).replaceAll(path.sep, "/");
@@ -74,6 +75,14 @@ function hasPortArg(args) {
   return args.some((arg) => arg === "-p" || arg === "--port" || arg.startsWith("--port="));
 }
 
+async function clearDevCache() {
+  const resolvedCachePath = path.resolve(nextCachePath);
+  if (resolvedCachePath !== path.join(rootDir, ".next")) {
+    throw new Error("Refusing to clear an unexpected Next.js cache path.");
+  }
+  await rm(resolvedCachePath, { force: true, recursive: true });
+}
+
 async function main() {
   const command = process.argv[2] || "dev";
   const port = await loadServerPort();
@@ -89,6 +98,9 @@ async function main() {
   }
 
   await loadLocalEnv();
+  if (command === "dev") {
+    await clearDevCache();
+  }
 
   const extraArgs = process.argv.slice(3);
   const args = [command, ...extraArgs];
