@@ -55,6 +55,7 @@ type SearchPayload = {
 const USER_AGENT =
   "BangumiLens/0.1 (+https://github.com/local/bangumi-lens; public episode comment summarizer)";
 const SEARCH_PAGE_SIZE = 8;
+const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5;
 const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SEARCH_CACHE_NAMESPACE = "bangumi-search-v2";
 const cache = new Map<string, { expiresAt: number; payload: SearchPayload }>();
@@ -96,8 +97,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | undefi
   return (await response.json()) as T;
 }
 
-async function searchSubjects(query: string, page: number) {
-  const offset = (page - 1) * SEARCH_PAGE_SIZE;
+async function searchSubjects(query: string, offset: number) {
   const payload = await fetchJson<{ data?: BangumiSubject[]; total?: number }>(
     `https://api.bgm.tv/v0/search/subjects?limit=${SEARCH_PAGE_SIZE}&offset=${offset}`,
     {
@@ -132,8 +132,7 @@ async function fetchFirstEpisode(subjectId: number) {
   })[0];
 }
 
-async function buildSearchPayload(query: string, page: number): Promise<SearchPayload> {
-  const { subjects, total } = await searchSubjects(query, page);
+async function buildSearchResults(subjects: BangumiSubject[]) {
   const results = await Promise.all(
     subjects.map(async (subject) => {
       if (!subject.id) return undefined;
@@ -155,13 +154,36 @@ async function buildSearchPayload(query: string, page: number): Promise<SearchPa
     })
   );
 
-  const filteredResults = results.filter((result): result is SearchResult => Boolean(result));
+  return results.filter((result): result is SearchResult => Boolean(result));
+}
+
+async function buildSearchPayload(query: string, page: number): Promise<SearchPayload> {
+  const targetStart = (page - 1) * SEARCH_PAGE_SIZE;
+  const targetEnd = page * SEARCH_PAGE_SIZE;
+  const targetUsableCount = targetEnd + 1;
+  const maxScannedPages = page + SEARCH_PAGE_EXTRA_SCAN_PAGES;
+  let offset = 0;
+  let total = 0;
+  let scannedPages = 0;
+  const usableResults: SearchResult[] = [];
+
+  while (usableResults.length < targetUsableCount && scannedPages < maxScannedPages) {
+    const subjectPage = await searchSubjects(query, offset);
+    total = subjectPage.total;
+    scannedPages += 1;
+    if (subjectPage.subjects.length === 0) break;
+
+    usableResults.push(...(await buildSearchResults(subjectPage.subjects)));
+    offset += SEARCH_PAGE_SIZE;
+    if (offset >= total) break;
+  }
+
   return {
-    results: filteredResults,
+    results: usableResults.slice(targetStart, targetEnd),
     total,
     page,
     pageSize: SEARCH_PAGE_SIZE,
-    hasNext: page * SEARCH_PAGE_SIZE < total
+    hasNext: usableResults.length > targetEnd || offset < total
   };
 }
 
@@ -235,6 +257,7 @@ export async function GET(request: Request) {
       page,
       count: payload.results.length,
       total: payload.total,
+      hasNext: payload.hasNext,
       durationMs: Date.now() - startedAt
     });
 

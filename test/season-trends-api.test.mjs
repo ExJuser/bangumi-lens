@@ -60,17 +60,21 @@ test("search API attaches cached empty subject episode lists to results", () => 
   assert.match(source, /await attachCachedSubjectInfoToPayload\(diskCached\)/);
 });
 
-test("search API requests paged Bangumi subjects and caches pages separately", () => {
+test("search API backfills pages with usable Bangumi subjects and caches pages separately", () => {
   const source = readFileSync(join(process.cwd(), "app", "api", "search", "route.ts"), "utf8");
 
   assert.match(source, /const SEARCH_PAGE_SIZE = 8/);
-  assert.match(source, /const offset = \(page - 1\) \* SEARCH_PAGE_SIZE/);
+  assert.match(source, /const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5/);
   assert.match(source, /search\/subjects\?limit=\$\{SEARCH_PAGE_SIZE\}&offset=\$\{offset\}/);
+  assert.match(source, /let offset = 0/);
+  assert.match(source, /while \(usableResults\.length < targetUsableCount && scannedPages < maxScannedPages\)/);
+  assert.match(source, /usableResults\.push\(\.\.\.\(await buildSearchResults\(subjectPage\.subjects\)\)\)/);
+  assert.match(source, /results: usableResults\.slice\(targetStart, targetEnd\)/);
   assert.match(source, /function buildSearchCacheKey/);
   assert.match(source, /const cacheKey = buildSearchCacheKey\(normalizedQuery, page\)/);
   assert.match(source, /readServerCache<SearchPayload>\(SEARCH_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS\)/);
   assert.match(source, /writeServerCache\(SEARCH_CACHE_NAMESPACE, cacheKey, payload\)/);
-  assert.match(source, /hasNext: page \* SEARCH_PAGE_SIZE < total/);
+  assert.match(source, /hasNext: usableResults\.length > targetEnd \|\| offset < total/);
 });
 
 test("subject info API can refresh cached empty episode lists", () => {
