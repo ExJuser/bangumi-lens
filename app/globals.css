@@ -952,26 +952,32 @@ input {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-self: center;
+  align-self: center;
+  grid-row: 1 / -1;
   margin: 0;
   padding: 14px 12px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 750;
+  text-align: center;
 }
 
 .episode-choice-error {
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
+  justify-self: center;
+  align-self: center;
+  grid-row: 1 / -1;
+  max-width: min(420px, calc(100% - 32px));
   margin: 0;
-  border: 1px solid rgba(204, 61, 61, 0.35);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--panel-soft) 92%, #cc3d3d);
   color: var(--accent-dark);
   font-size: 14px;
   font-weight: 750;
   line-height: 1.5;
-  padding: 14px;
+  padding: 14px 12px;
+  text-align: left;
 }
 
 .episode-choice-error svg {
@@ -1137,14 +1143,14 @@ input {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
-  width: min(920px, 100%);
-  height: min(760px, calc(100vh - 48px));
-  max-height: calc(100vh - 48px);
+  width: min(1080px, calc(100vw - 48px));
+  height: min(840px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   box-shadow: var(--shadow);
-  padding: 22px;
+  padding: 24px;
 }
 
 .search-selection-head {
@@ -1171,8 +1177,8 @@ input {
 
 .search-selection-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
-  gap: 14px;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.25fr);
+  gap: 16px;
   min-height: 0;
 }
 
