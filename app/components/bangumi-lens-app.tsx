@@ -230,16 +230,41 @@ type HealthStatus = {
 };
 
 const PROMPT_PRESETS: { id: PromptPresetId; name: string; description: string }[] = [
-  { id: "default", name: "标准复盘", description: "结构完整，口吻克制" },
-  { id: "brief", name: "短摘要", description: "更短，更快扫读" },
-  { id: "deep_review", name: "长复盘", description: "展开观点和分歧" },
-  { id: "production_focus", name: "制作向", description: "偏演出、作画、制作线索" },
-  { id: "spoiler_safe", name: "原作避雷", description: "正文避开后续和原作信息" },
-  { id: "restrained_snark", name: "吐槽向但克制", description: "保留玩梗和吐槽信号" }
+  { id: "default", name: "标准复盘 - 剧情、观点、细节都保留", description: "适合常规阅读：结构完整，口吻克制，兼顾剧情归纳和评论区主要分歧。" },
+  { id: "brief", name: "短摘要 - 快速扫读本集反应", description: "适合先看结论：压缩篇幅，只保留最明确的剧情信息、观众态度和讨论信号。" },
+  {
+    id: "deep_review",
+    name: "长复盘 - 展开观点分歧和细节线索",
+    description: "适合认真回看：篇幅更长，覆盖更多立场、争议点、共鸣点和容易漏掉的小细节。"
+  },
+  {
+    id: "production_focus",
+    name: "制作向 - 关注演出作画和公开制作线索",
+    description: "适合看制作讨论：优先整理分镜、演出、作画、音响、CV 表现和可靠的公开制作背景。"
+  },
+  {
+    id: "spoiler_safe",
+    name: "原作避雷 - 正文避开后续和原作信息",
+    description: "适合动画党阅读：正文只写本集已确认内容，原作或后续相关讨论会转入避雷提示。"
+  },
+  {
+    id: "restrained_snark",
+    name: "吐槽向但克制 - 保留评论区梗味",
+    description: "适合想看社区语气：保留玩梗、反讽和吐槽信号，但不放大少数观点或人身攻击。"
+  }
 ];
 
 function isPromptPresetId(value: string): value is PromptPresetId {
   return PROMPT_PRESETS.some((preset) => preset.id === value);
+}
+
+function getPromptPreset(presetId: string | undefined) {
+  return PROMPT_PRESETS.find((preset) => preset.id === presetId) || PROMPT_PRESETS[0];
+}
+
+function getPromptPresetIdFromReport(nextReport: Report | null): PromptPresetId {
+  const reportPresetId = nextReport?.promptPreset?.id;
+  return reportPresetId && isPromptPresetId(reportPresetId) ? reportPresetId : "default";
 }
 
 function HoverScrollText({ className, text }: { className?: string; text: string }) {
@@ -332,6 +357,13 @@ type PendingAiTitleTranslation = {
 type PendingReportRegeneration = {
   url: string;
   title: string;
+};
+type PendingPromptPresetSwitch = {
+  nextPresetId: PromptPresetId;
+  currentPresetName: string;
+  nextPresetName: string;
+  reportTitle: string;
+  reportUrl: string;
 };
 type PendingAiSubjectTitleTranslation = {
   subjectId: string;
@@ -1897,6 +1929,7 @@ export default function BangumiLensApp() {
   const [pendingAutoAnalyzeUrl, setPendingAutoAnalyzeUrl] = useState("");
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
   const [pendingReportRegeneration, setPendingReportRegeneration] = useState<PendingReportRegeneration | null>(null);
+  const [pendingPromptPresetSwitch, setPendingPromptPresetSwitch] = useState<PendingPromptPresetSwitch | null>(null);
   const [pendingAiTitleTranslation, setPendingAiTitleTranslation] = useState<PendingAiTitleTranslation | null>(null);
   const [pendingAiSubjectTitleTranslation, setPendingAiSubjectTitleTranslation] =
     useState<PendingAiSubjectTitleTranslation | null>(null);
@@ -1988,6 +2021,7 @@ export default function BangumiLensApp() {
       pendingDuplicate ||
       pendingAutoAnalyzeUrl ||
       pendingReportRegeneration ||
+      pendingPromptPresetSwitch ||
       pendingSearchEpisodeGeneration ||
       visiblePendingSeasonReportGeneration ||
       pendingAiTitleTranslation ||
@@ -2206,6 +2240,13 @@ export default function BangumiLensApp() {
   }, []);
 
   useEffect(() => {
+    const reportPromptPresetId = report?.promptPreset?.id;
+    if (reportPromptPresetId && isPromptPresetId(reportPromptPresetId) && reportPromptPresetId !== promptPresetId) {
+      setPromptPresetId(reportPromptPresetId);
+    }
+  }, [promptPresetId, report?.promptPreset?.id]);
+
+  useEffect(() => {
     if (!pendingDuplicate) return;
     const duplicate = pendingDuplicate;
 
@@ -2282,6 +2323,19 @@ export default function BangumiLensApp() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [missingEpisodePrompt]);
+
+  useEffect(() => {
+    if (!pendingPromptPresetSwitch) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPendingPromptPresetSwitch(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pendingPromptPresetSwitch]);
 
   useEffect(() => {
     if (!deleteHistoryPrompt) return;
@@ -2385,6 +2439,35 @@ export default function BangumiLensApp() {
     window.localStorage.setItem(PROMPT_PRESET_STORAGE_KEY, nextPresetId);
   }
 
+  function requestPromptPresetChange(nextPresetId: PromptPresetId) {
+    if (!report) {
+      changePromptPreset(nextPresetId);
+      return;
+    }
+
+    const currentReportPresetId = getPromptPresetIdFromReport(report);
+    if (nextPresetId === currentReportPresetId) {
+      changePromptPreset(nextPresetId);
+      return;
+    }
+
+    setPendingPromptPresetSwitch({
+      nextPresetId,
+      currentPresetName: getPromptPreset(currentReportPresetId).name,
+      nextPresetName: getPromptPreset(nextPresetId).name,
+      reportTitle: getHistoryEpisodeLabel(report),
+      reportUrl: report.meta.url
+    });
+  }
+
+  function confirmPromptPresetSwitch() {
+    if (!pendingPromptPresetSwitch) return;
+    const { nextPresetId, reportUrl } = pendingPromptPresetSwitch;
+    setPendingPromptPresetSwitch(null);
+    changePromptPreset(nextPresetId);
+    void runAnalysis(reportUrl, { promptPresetId: nextPresetId });
+  }
+
   function goHome() {
     returningHomeRef.current = true;
     loadedRouteReportIdRef.current = null;
@@ -2413,6 +2496,7 @@ export default function BangumiLensApp() {
     setPendingDuplicate(null);
     setPendingAutoAnalyzeUrl("");
     setPendingReportRegeneration(null);
+    setPendingPromptPresetSwitch(null);
     setPendingAiTitleTranslation(null);
     setPendingAiSubjectTitleTranslation(null);
     router.push(HOME_ROUTE);
@@ -3089,7 +3173,8 @@ export default function BangumiLensApp() {
     );
   }
 
-  const runAnalysis = useCallback(async (trimmedUrl: string) => {
+  const runAnalysis = useCallback(async (trimmedUrl: string, options: { promptPresetId?: PromptPresetId } = {}) => {
+    const analysisPromptPresetId = options.promptPresetId ?? promptPresetId;
     setError("");
     setReport(null);
     setStreamingText("");
@@ -3099,7 +3184,7 @@ export default function BangumiLensApp() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: trimmedUrl, promptPresetId })
+        body: JSON.stringify({ url: trimmedUrl, promptPresetId: analysisPromptPresetId })
       });
 
       if (!response.ok) {
@@ -4183,24 +4268,26 @@ export default function BangumiLensApp() {
             ) : null}
           </div>
           <label className="prompt-preset-control" htmlFor="prompt-preset">
-            <span>报告风格</span>
-            <select
-              id="prompt-preset"
-              value={promptPresetId}
-              onChange={(event) => {
-                if (isPromptPresetId(event.target.value)) {
-                  changePromptPreset(event.target.value);
-                }
-              }}
-              disabled={loading || searching}
-            >
-              {PROMPT_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
-            <em>{PROMPT_PRESETS.find((preset) => preset.id === promptPresetId)?.description}</em>
+            <span className="prompt-preset-label">报告风格</span>
+            <span className="prompt-preset-field">
+              <select
+                id="prompt-preset"
+                value={promptPresetId}
+                onChange={(event) => {
+                  if (isPromptPresetId(event.target.value)) {
+                    requestPromptPresetChange(event.target.value);
+                  }
+                }}
+                disabled={loading || searching}
+              >
+                {PROMPT_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+              <em>{getPromptPreset(promptPresetId).description}</em>
+            </span>
           </label>
           <p className="hint">输入作品名会先搜索 Bangumi 条目；确认作品后再选择具体话数。已有本地报告会在选中章节后提示查看或重新生成。</p>
         </form>
@@ -4880,6 +4967,25 @@ export default function BangumiLensApp() {
           actions={[
             { label: "取消", onClick: () => setPendingReportRegeneration(null), className: "secondary-action" },
             { label: "确认重新生成", onClick: confirmReportRegeneration, className: "primary-action" }
+          ]}
+        />
+      ) : null}
+      {pendingPromptPresetSwitch ? (
+        <ConfirmDialog
+          titleId="prompt-preset-switch-title"
+          icon={<Sparkles size={20} />}
+          label="切换风格"
+          title="是否用新风格重新生成报告？"
+          description={
+            <>
+              当前报告「{pendingPromptPresetSwitch.reportTitle}」使用的是「{pendingPromptPresetSwitch.currentPresetName}」。
+              切换到「{pendingPromptPresetSwitch.nextPresetName}」会重新读取公开评论并覆盖这份本地报告。
+            </>
+          }
+          onClose={() => setPendingPromptPresetSwitch(null)}
+          actions={[
+            { label: "取消", onClick: () => setPendingPromptPresetSwitch(null), className: "secondary-action" },
+            { label: "切换并重新生成", onClick: confirmPromptPresetSwitch, className: "primary-action" }
           ]}
         />
       ) : null}

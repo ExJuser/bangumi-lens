@@ -870,18 +870,43 @@ html[data-ui="polished"], html[data-ui="polished"] body {
 :root[data-ui="polished"] .prompt-preset-control {
   display: grid;
   grid-template-columns: auto minmax(180px, 1fr);
-  gap: 7px 10px;
-  align-items: center;
+  column-gap: 12px;
+  align-items: start;
   margin-top: 10px;
 }
 
-:root[data-ui="polished"] .prompt-preset-control span {
+:root[data-ui="polished"] .prompt-preset-label {
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
+  line-height: 36px;
+  white-space: nowrap;
+}
+
+:root[data-ui="polished"] .prompt-preset-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  position: relative;
+}
+
+:root[data-ui="polished"] .prompt-preset-field::after {
+  content: "";
+  position: absolute;
+  top: 15px;
+  right: 14px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.75px solid var(--ink);
+  border-bottom: 1.75px solid var(--ink);
+  pointer-events: none;
+  transform: rotate(45deg);
 }
 
 :root[data-ui="polished"] .prompt-preset-control select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
   min-height: 36px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -889,14 +914,14 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   color: var(--ink);
   font: inherit;
   font-weight: 700;
-  padding: 6px 9px;
+  padding: 6px 38px 6px 9px;
 }
 
 :root[data-ui="polished"] .prompt-preset-control em {
-  grid-column: 2;
   color: var(--muted);
   font-size: 13px;
   font-style: normal;
+  line-height: 1.45;
 }
 
 :root[data-ui="polished"] .hint, :root[data-ui="polished"] .muted {
@@ -3540,6 +3565,15 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   :root[data-ui="polished"] .input-row button, :root[data-ui="polished"] .source-link-button {
     flex-basis: auto;
     width: 100%;
+  }
+
+  :root[data-ui="polished"] .prompt-preset-control {
+    grid-template-columns: 1fr;
+    row-gap: 6px;
+  }
+
+  :root[data-ui="polished"] .prompt-preset-label {
+    line-height: 1.2;
   }
 
   :root[data-ui="polished"] .toast-notice {
