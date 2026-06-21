@@ -226,6 +226,24 @@ test("season report generation progress is scoped to the current subject", () =>
   assert.match(source, /generation=\{visibleSeasonReportGeneration\}/);
 });
 
+test("search-selected report generation hides season trend threshold copy", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const progressBody = source.slice(
+    source.indexOf("function SeasonReportGenerationProgress"),
+    source.indexOf("function SeasonTrendPanel")
+  );
+  const searchGenerationBody = source.slice(
+    source.indexOf("async function confirmSelectedSearchEpisodes"),
+    source.indexOf("function closeSearchSelectionDialog")
+  );
+
+  assert.match(source, /source: "season-gap-fill" \| "search-selection";/);
+  assert.match(progressBody, /const showSeasonTrendThreshold = generation\.source === "season-gap-fill"/);
+  assert.match(progressBody, /showSeasonTrendThreshold \? \(/);
+  assert.match(progressBody, /整季趋势/);
+  assert.match(searchGenerationBody, /source: "search-selection"/);
+});
+
 test("season trend charts use compact stats for one or two saved reports", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");

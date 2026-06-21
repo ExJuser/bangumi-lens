@@ -274,6 +274,7 @@ type SeasonReportGenerationItem = {
 };
 
 type SeasonReportGenerationState = {
+  source: "season-gap-fill" | "search-selection";
   subjectKey: string;
   status: "running" | "completed" | "cancelled" | "failed";
   totalCount: number;
@@ -801,6 +802,7 @@ function SeasonReportGenerationProgress({
   const settledCount = generation.completedCount + generation.failedCount;
   const progressCount = running ? Math.min(generation.totalCount, settledCount + 0.45) : settledCount;
   const percent = generation.totalCount > 0 ? Math.round((progressCount / generation.totalCount) * 100) : 0;
+  const showSeasonTrendThreshold = generation.source === "season-gap-fill";
 
   return (
     <article className="season-report-generation">
@@ -812,12 +814,14 @@ function SeasonReportGenerationProgress({
             {generation.failedCount > 0 ? `，失败 ${generation.failedCount}` : ""}
             {generation.currentLabel ? `，当前 ${generation.currentLabel}` : ""}
           </p>
-          <p>
-            已保存 {generation.savedReportCount} 集，至少需要 {generation.requiredReportCount} 集
-            {generation.missingReportCount > 0
-              ? `；还差 ${generation.missingReportCount} 集后再生成整季趋势。`
-              : "；已满足整季趋势生成门槛。"}
-          </p>
+          {showSeasonTrendThreshold ? (
+            <p>
+              已保存 {generation.savedReportCount} 集，至少需要 {generation.requiredReportCount} 集
+              {generation.missingReportCount > 0
+                ? `；还差 ${generation.missingReportCount} 集后再生成整季趋势。`
+                : "；已满足整季趋势生成门槛。"}
+            </p>
+          ) : null}
         </div>
         {running ? (
           <button className="season-report-cancel" type="button" onClick={onCancel}>
@@ -2298,6 +2302,7 @@ export default function BangumiLensApp() {
           : 2;
     const initialSavedReportCount = generationPlan.savedReportCount;
     setSeasonReportGeneration({
+      source: "season-gap-fill",
       subjectKey: generationPlan.subjectKey,
       status: "running",
       totalCount: initialItems.length,
@@ -3040,6 +3045,7 @@ export default function BangumiLensApp() {
     }));
     const subjectKey = "";
     setSeasonReportGeneration({
+      source: "search-selection",
       subjectKey,
       status: "running",
       totalCount: initialItems.length,
