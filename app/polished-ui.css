@@ -144,7 +144,7 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   margin-bottom: 8px;
 }
 
-:root[data-ui="polished"] .home-button, :root[data-ui="polished"] .theme-toggle, :root[data-ui="polished"] .ui-mode-toggle {
+:root[data-ui="polished"] .home-button, :root[data-ui="polished"] .health-toggle, :root[data-ui="polished"] .theme-toggle, :root[data-ui="polished"] .ui-mode-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -158,13 +158,19 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   font-weight: 750;
 }
 
-:root[data-ui="polished"] .home-button:hover, :root[data-ui="polished"] .theme-toggle:hover, :root[data-ui="polished"] .ui-mode-toggle:hover {
+:root[data-ui="polished"] .home-button:hover, :root[data-ui="polished"] .health-toggle:hover, :root[data-ui="polished"] .theme-toggle:hover, :root[data-ui="polished"] .ui-mode-toggle:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   background: var(--selected);
   color: var(--accent-dark);
 }
 
 :root[data-ui="polished"] .ui-mode-toggle[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: var(--selected);
+  color: var(--accent-dark);
+}
+
+:root[data-ui="polished"] .health-toggle[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
   background: var(--selected);
   color: var(--accent-dark);
@@ -1719,6 +1725,121 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   white-space: pre-wrap;
   word-break: break-word;
   padding: 12px;
+}
+
+:root[data-ui="polished"] .health-view {
+  display: grid;
+  gap: 18px;
+}
+
+:root[data-ui="polished"] .health-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  padding: 22px;
+}
+
+:root[data-ui="polished"] .health-head h1 {
+  margin: 8px 0 8px;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+:root[data-ui="polished"] .health-head p,
+:root[data-ui="polished"] .health-card p,
+:root[data-ui="polished"] .health-config-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+:root[data-ui="polished"] .health-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 7px 11px;
+}
+
+:root[data-ui="polished"] .health-grid,
+:root[data-ui="polished"] .health-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+:root[data-ui="polished"] .health-card strong {
+  display: block;
+  margin: 12px 0 4px;
+  color: var(--ink);
+  font-size: 30px;
+  line-height: 1;
+}
+
+:root[data-ui="polished"] .health-config-grid {
+  margin: 14px 0;
+}
+
+:root[data-ui="polished"] .health-config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  padding: 9px 11px;
+}
+
+:root[data-ui="polished"] .health-config-item strong {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+:root[data-ui="polished"] .health-config-item.active strong {
+  color: var(--green);
+}
+
+:root[data-ui="polished"] .health-error-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+:root[data-ui="polished"] .health-error-item {
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--danger) 7%, var(--field));
+  padding: 10px 12px;
+}
+
+:root[data-ui="polished"] .health-error-item span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+:root[data-ui="polished"] .health-error-item strong {
+  display: block;
+  margin-top: 3px;
+}
+
+:root[data-ui="polished"] .health-error-item p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 :root[data-ui="polished"] .empty-dashboard {

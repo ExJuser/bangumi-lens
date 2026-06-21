@@ -102,6 +102,7 @@ input {
 }
 
 .home-button,
+.health-toggle,
 .theme-toggle,
 .ui-mode-toggle {
   display: inline-flex;
@@ -119,6 +120,7 @@ input {
 }
 
 .home-button:hover,
+.health-toggle:hover,
 .theme-toggle:hover,
 .ui-mode-toggle:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
@@ -126,6 +128,12 @@ input {
 }
 
 .ui-mode-toggle[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-soft));
+  color: var(--accent-dark);
+}
+
+.health-toggle[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
   background: color-mix(in srgb, var(--accent) 10%, var(--panel-soft));
   color: var(--accent-dark);
@@ -1806,6 +1814,121 @@ input {
   white-space: pre-wrap;
   word-break: break-word;
   padding: 12px;
+}
+
+.health-view {
+  display: grid;
+  gap: 18px;
+}
+
+.health-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 22px;
+}
+
+.health-head h1 {
+  margin: 8px 0 8px;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.health-head p,
+.health-card p,
+.health-config-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.health-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 7px 11px;
+}
+
+.health-grid,
+.health-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.health-card strong {
+  display: block;
+  margin: 12px 0 4px;
+  color: var(--ink);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.health-config-grid {
+  margin: 14px 0;
+}
+
+.health-config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 9px 11px;
+}
+
+.health-config-item strong {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.health-config-item.active strong {
+  color: var(--green);
+}
+
+.health-error-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.health-error-item {
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--field));
+  padding: 10px 12px;
+}
+
+.health-error-item span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.health-error-item strong {
+  display: block;
+  margin-top: 3px;
+}
+
+.health-error-item p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 .empty-dashboard {

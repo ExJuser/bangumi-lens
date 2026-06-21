@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   AlertCircle,
   ArrowRight,
   BarChart3,
@@ -190,6 +191,31 @@ type SeasonTrendPayload = {
   localSummary: string;
 };
 
+type HealthStatus = {
+  reports: {
+    count: number;
+  };
+  cache: {
+    fileCount: number;
+    totalBytes: number;
+  };
+  logs: {
+    recentErrors: {
+      time?: string;
+      level?: string;
+      message?: string;
+      errorMessage?: string;
+    }[];
+  };
+  config: {
+    modelApiKeyConfigured: boolean;
+    bangumiAccessTokenConfigured: boolean;
+    proxyConfigured: boolean;
+    model: string;
+    baseUrl: string;
+  };
+};
+
 function HoverScrollText({ className, text }: { className?: string; text: string }) {
   const viewportRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
@@ -249,6 +275,7 @@ const UI_MODE_STORAGE_KEY = "bangumi-lens-ui-mode";
 const HOME_ROUTE = "/home";
 const REPORT_ROUTE_PREFIX = "/reports/";
 const SUMMARY_ROUTE_PREFIX = "/summary/";
+const HEALTH_ROUTE = "/health";
 const REPORT_STALE_THRESHOLD_MS = 15 * 24 * 60 * 60 * 1000;
 type ThemeMode = "day" | "night";
 type UiMode = "classic" | "polished";
@@ -519,6 +546,113 @@ function Metric({ label, value }: { label: string; value: number }) {
       <span title={String(value)}>{formatMetricValue(value)}</span>
       <p>{label}</p>
     </div>
+  );
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function ConfigStatus({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div className={active ? "health-config-item active" : "health-config-item"}>
+      <span>{label}</span>
+      <strong>{active ? "已配置" : "未配置"}</strong>
+    </div>
+  );
+}
+
+function HealthPanel({
+  health,
+  loading,
+  error,
+  onRefresh
+}: {
+  health: HealthStatus | null;
+  loading: boolean;
+  error: string;
+  onRefresh: () => void;
+}) {
+  return (
+    <section className="health-view">
+      <div className="health-head">
+        <div>
+          <span className="eyebrow">
+            <Activity size={16} />
+            Local Health
+          </span>
+          <h1>本地数据健康状态</h1>
+          <p>查看报告、缓存、日志和运行配置状态。这里不显示任何密钥明文。</p>
+        </div>
+        <button className="health-refresh" type="button" onClick={onRefresh} disabled={loading}>
+          {loading ? <Loader2 className="spin" size={17} /> : <RefreshCw size={17} />}
+          <span>{loading ? "正在刷新" : "刷新"}</span>
+        </button>
+      </div>
+
+      {error ? (
+        <section className="notice error" role="alert">
+          <AlertCircle size={17} />
+          <span>{error}</span>
+        </section>
+      ) : null}
+
+      <div className="health-grid">
+        <article className="panel health-card">
+          <div className="panel-title">
+            <History size={18} />
+            <h2>本地报告</h2>
+          </div>
+          <strong>{health ? health.reports.count : "..."}</strong>
+          <p>保存在本机的报告索引数量。</p>
+        </article>
+        <article className="panel health-card">
+          <div className="panel-title">
+            <BarChart3 size={18} />
+            <h2>缓存</h2>
+          </div>
+          <strong>{health ? formatBytes(health.cache.totalBytes) : "..."}</strong>
+          <p>{health ? `${health.cache.fileCount} 个缓存文件` : "正在读取缓存目录"}</p>
+        </article>
+      </div>
+
+      <article className="panel health-config">
+        <div className="panel-title">
+          <Sparkles size={18} />
+          <h2>运行配置</h2>
+        </div>
+        <div className="health-config-grid">
+          <ConfigStatus label="模型 API Key" active={Boolean(health?.config.modelApiKeyConfigured)} />
+          <ConfigStatus label="Bangumi Token" active={Boolean(health?.config.bangumiAccessTokenConfigured)} />
+          <ConfigStatus label="服务端代理" active={Boolean(health?.config.proxyConfigured)} />
+        </div>
+        <p className="health-config-note">
+          模型：{health?.config.model || "..."} / API：{health?.config.baseUrl || "..."}
+        </p>
+      </article>
+
+      <article className="panel health-errors">
+        <div className="panel-title">
+          <AlertCircle size={18} />
+          <h2>最近错误</h2>
+        </div>
+        {health && health.logs.recentErrors.length > 0 ? (
+          <div className="health-error-list">
+            {health.logs.recentErrors.map((entry, index) => (
+              <section className="health-error-item" key={`${entry.time}-${entry.message}-${index}`}>
+                <span>{entry.time ? formatSavedAt(entry.time) : "未知时间"}</span>
+                <strong>{entry.message || "error"}</strong>
+                {entry.errorMessage ? <p>{entry.errorMessage}</p> : null}
+              </section>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">没有最近错误记录。</p>
+        )}
+      </article>
+    </section>
   );
 }
 
@@ -1601,6 +1735,10 @@ function isHomePath(pathname: string) {
   return pathname === HOME_ROUTE || pathname === "/";
 }
 
+function isHealthPath(pathname: string) {
+  return pathname === HEALTH_ROUTE;
+}
+
 function isEpisodeUnavailable(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
   if (direction !== "next") return false;
   if (report.meta.nextEpisodeId !== null) return false;
@@ -1700,6 +1838,9 @@ export default function BangumiLensApp() {
   const [likeHistoryPrompt, setLikeHistoryPrompt] = useState<LikeHistoryPrompt | null>(null);
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
   const [clearHistoryPrompt, setClearHistoryPrompt] = useState(false);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState("");
   const [subjectInfoById, setSubjectInfoById] = useState<Record<string, SubjectInfo>>({});
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -2346,6 +2487,24 @@ export default function BangumiLensApp() {
     setLikeHistoryPrompt(null);
     toggleReportLike(item, liked);
   }
+
+  const loadHealth = useCallback(async () => {
+    setHealthLoading(true);
+    setHealthError("");
+
+    try {
+      const response = await fetch("/api/health", { cache: "no-store" });
+      const payload = (await response.json()) as { health?: HealthStatus; error?: string };
+      if (!response.ok || !payload.health) {
+        throw new Error(payload.error || "本地数据健康状态读取失败。");
+      }
+      setHealth(payload.health);
+    } catch (error) {
+      setHealthError(error instanceof Error ? error.message : "本地数据健康状态读取失败。");
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
 
   const loadSeasonTrend = useCallback(async () => {
     const currentReport = report;
@@ -3128,6 +3287,11 @@ export default function BangumiLensApp() {
     void loadSeasonTrend();
   }, [loadSeasonTrend, report, seasonTrendLoading, showSeasonTrend, summaryRoute]);
 
+  useEffect(() => {
+    if (!isHealthPath(pathname) || health || healthLoading) return;
+    void loadHealth();
+  }, [health, healthLoading, loadHealth, pathname]);
+
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedUrl = url.trim();
@@ -3791,6 +3955,18 @@ export default function BangumiLensApp() {
             <span>回到首页</span>
           </button>
         ) : null}
+        <button
+          aria-pressed={isHealthPath(pathname)}
+          className="health-toggle"
+          type="button"
+          onClick={() => {
+            router.push(HEALTH_ROUTE);
+            void loadHealth();
+          }}
+        >
+          <Activity size={17} />
+          <span>健康状态</span>
+        </button>
         <button className="theme-toggle" type="button" onClick={toggleTheme}>
           {theme === "day" ? <Moon size={17} /> : <Sun size={17} />}
           <span>{theme === "day" ? "夜间模式" : "日间模式"}</span>
@@ -3805,6 +3981,10 @@ export default function BangumiLensApp() {
           <span>{uiMode === "polished" ? "经典 UI" : "新版 UI"}</span>
         </button>
       </div>
+      {isHealthPath(pathname) ? (
+        <HealthPanel health={health} loading={healthLoading} error={healthError} onRefresh={loadHealth} />
+      ) : (
+      <>
       <section className={report ? "hero hero-report" : "hero"}>
         <div className="hero-copy">
           {report ? (
@@ -4205,6 +4385,8 @@ export default function BangumiLensApp() {
           ) : null}
         </section>
       ) : null}
+      </>
+      )}
 
       {searchSelectionOpen ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeSearchSelectionDialog}>
