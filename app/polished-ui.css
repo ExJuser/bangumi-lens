@@ -1336,12 +1336,44 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   opacity: 0.5;
 }
 
-:root[data-ui="polished"] .search-pagination span, :root[data-ui="polished"] .episode-pagination span {
+:root[data-ui="polished"] .pagination-jump {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+:root[data-ui="polished"] .pagination-jump input {
+  width: 44px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+:root[data-ui="polished"] .pagination-jump input:hover, :root[data-ui="polished"] .pagination-jump input:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--selected);
+  color: var(--accent-dark);
+}
+
+:root[data-ui="polished"] .pagination-jump input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+:root[data-ui="polished"] .pagination-jump input:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 :root[data-ui="polished"] .episode-pagination {

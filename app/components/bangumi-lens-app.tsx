@@ -1607,10 +1607,12 @@ export default function BangumiLensApp() {
   const [refreshingSearchResults, setRefreshingSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchPagination, setSearchPagination] = useState<SearchPagination | null>(null);
+  const [searchPageInput, setSearchPageInput] = useState("");
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
   const [searchEpisodeQuery, setSearchEpisodeQuery] = useState("");
   const [searchEpisodePage, setSearchEpisodePage] = useState(1);
+  const [searchEpisodePageInput, setSearchEpisodePageInput] = useState("");
   const [selectedSearchEpisodeIds, setSelectedSearchEpisodeIds] = useState<Set<string>>(() => new Set());
   const [searchSelectionError, setSearchSelectionError] = useState("");
   const [pendingSearchEpisodeGeneration, setPendingSearchEpisodeGeneration] =
@@ -1648,6 +1650,8 @@ export default function BangumiLensApp() {
     searchPagination && searchPagination.total > 0
       ? `${searchPagination.total} 个结果，第 ${searchPagination.page} 页`
       : `${searchResults.length} 个结果`;
+  const searchPage = searchPagination?.page ?? null;
+  const searchPageCount = searchPagination ? Math.max(1, Math.ceil(searchPagination.total / searchPagination.pageSize)) : 1;
   const canGoPreviousSearchPage = Boolean(searchPagination && searchPagination.page > 1 && !searching);
   const canGoNextSearchPage = Boolean(searchPagination?.hasNext && !searching);
   const modalOpen = Boolean(
@@ -1690,6 +1694,14 @@ export default function BangumiLensApp() {
   useEffect(() => {
     setSearchEpisodePage(1);
   }, [searchEpisodeQuery]);
+
+  useEffect(() => {
+    setSearchPageInput(searchPage ? String(searchPage) : "");
+  }, [searchPage]);
+
+  useEffect(() => {
+    setSearchEpisodePageInput(String(normalizedSearchEpisodePage));
+  }, [normalizedSearchEpisodePage]);
 
   const savedSearchEpisodeIds = useMemo(
     () => new Set(history.map((item) => getSavedReportMeta(item).episodeId).filter((episodeId): episodeId is string => Boolean(episodeId))),
@@ -3208,6 +3220,37 @@ export default function BangumiLensApp() {
     void searchByTitle(searchPagination.query, page);
   }
 
+  function submitSearchPageInput() {
+    if (!searchPagination || searching) {
+      setSearchPageInput(searchPagination ? String(searchPagination.page) : "");
+      return;
+    }
+
+    const parsedPage = Number(searchPageInput);
+    if (!Number.isInteger(parsedPage)) {
+      setSearchPageInput(String(searchPagination.page));
+      return;
+    }
+
+    const nextPage = Math.min(Math.max(1, parsedPage), searchPageCount);
+    setSearchPageInput(String(nextPage));
+    if (nextPage !== searchPagination.page) {
+      goToSearchPage(nextPage);
+    }
+  }
+
+  function submitSearchEpisodePageInput() {
+    const parsedPage = Number(searchEpisodePageInput);
+    if (!Number.isInteger(parsedPage)) {
+      setSearchEpisodePageInput(String(normalizedSearchEpisodePage));
+      return;
+    }
+
+    const nextPage = Math.min(Math.max(1, parsedPage), searchEpisodePageCount);
+    setSearchEpisodePageInput(String(nextPage));
+    goToSearchEpisodePage(nextPage);
+  }
+
   function useExistingReport() {
     if (!pendingDuplicate) return;
     void openSavedReport(pendingDuplicate);
@@ -3844,9 +3887,30 @@ export default function BangumiLensApp() {
                       <ChevronLeft size={14} />
                       上一页
                     </button>
-                    <span>
-                      {searching ? "加载中" : `${searchPagination.page} / ${Math.max(1, Math.ceil(searchPagination.total / searchPagination.pageSize))}`}
-                    </span>
+                    <label className="pagination-jump">
+                      <input
+                        aria-label={`跳转到搜索结果页，当前共 ${searchPageCount} 页`}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={searching ? "" : searchPageInput}
+                        placeholder={searching ? "加载中" : undefined}
+                        disabled={searching}
+                        onChange={(event) => setSearchPageInput(event.target.value.replace(/\D/g, ""))}
+                        onBlur={submitSearchPageInput}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            submitSearchPageInput();
+                            event.currentTarget.blur();
+                          }
+                          if (event.key === "Escape") {
+                            setSearchPageInput(String(searchPagination.page));
+                            event.currentTarget.blur();
+                          }
+                        }}
+                      />
+                      <span>/ {searchPageCount}</span>
+                    </label>
                     <button
                       type="button"
                       onClick={() => goToSearchPage(searchPagination.page + 1)}
@@ -3968,9 +4032,28 @@ export default function BangumiLensApp() {
                               <ChevronLeft size={14} />
                               上一页
                             </button>
-                            <span>
-                              {normalizedSearchEpisodePage} / {searchEpisodePageCount}
-                            </span>
+                            <label className="pagination-jump">
+                              <input
+                                aria-label={`跳转到章节页，当前共 ${searchEpisodePageCount} 页`}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={searchEpisodePageInput}
+                                onChange={(event) => setSearchEpisodePageInput(event.target.value.replace(/\D/g, ""))}
+                                onBlur={submitSearchEpisodePageInput}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    submitSearchEpisodePageInput();
+                                    event.currentTarget.blur();
+                                  }
+                                  if (event.key === "Escape") {
+                                    setSearchEpisodePageInput(String(normalizedSearchEpisodePage));
+                                    event.currentTarget.blur();
+                                  }
+                                }}
+                              />
+                              <span>/ {searchEpisodePageCount}</span>
+                            </label>
                             <button
                               type="button"
                               onClick={() => goToSearchEpisodePage(normalizedSearchEpisodePage + 1)}

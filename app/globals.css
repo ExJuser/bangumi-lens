@@ -1408,13 +1408,45 @@ input {
   opacity: 0.5;
 }
 
-.search-pagination span,
-.episode-pagination span {
+.pagination-jump {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.pagination-jump input {
+  width: 44px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.pagination-jump input:hover,
+.pagination-jump input:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent-dark);
+  outline: none;
+}
+
+.pagination-jump input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.pagination-jump input:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .episode-pagination {
