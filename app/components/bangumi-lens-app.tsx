@@ -24,7 +24,8 @@ import {
   Sparkles,
   Star,
   Sun,
-  ThumbsUp
+  ThumbsUp,
+  X
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -254,6 +255,12 @@ type PendingAiSubjectTitleTranslation = {
 type LikeHistoryPrompt = {
   item: SavedReport;
   liked: boolean;
+};
+
+type PendingSearchEpisodeGeneration = {
+  subjectName: string;
+  episodes: SearchEpisodeChoice[];
+  skippedCount: number;
 };
 
 type SeasonReportGenerationItemStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
@@ -1530,6 +1537,10 @@ export default function BangumiLensApp() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
+  const [searchEpisodeQuery, setSearchEpisodeQuery] = useState("");
+  const [selectedSearchEpisodeIds, setSelectedSearchEpisodeIds] = useState<Set<string>>(() => new Set());
+  const [pendingSearchEpisodeGeneration, setPendingSearchEpisodeGeneration] =
+    useState<PendingSearchEpisodeGeneration | null>(null);
   const [loadingSearchEpisodes, setLoadingSearchEpisodes] = useState(false);
   const [reportSwitching, setReportSwitching] = useState(false);
   const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(() => new Set());
@@ -1554,7 +1565,7 @@ export default function BangumiLensApp() {
   const currentSubjectKey = report ? getSubjectKey(report) : "";
   const summaryRoute = isSummaryPath(pathname);
   const visibleSeasonReportGeneration =
-    seasonReportGeneration?.subjectKey === currentSubjectKey ? seasonReportGeneration : null;
+    seasonReportGeneration && seasonReportGeneration.subjectKey === currentSubjectKey ? seasonReportGeneration : null;
   const visiblePendingSeasonReportGeneration =
     pendingSeasonReportGeneration?.subjectKey === currentSubjectKey ? pendingSeasonReportGeneration : null;
   const searchSelectionOpen = searchResults.length > 0 || Boolean(selectedSearchResult);
@@ -1563,6 +1574,7 @@ export default function BangumiLensApp() {
       pendingDuplicate ||
       pendingAutoAnalyzeUrl ||
       pendingReportRegeneration ||
+      pendingSearchEpisodeGeneration ||
       visiblePendingSeasonReportGeneration ||
       pendingAiTitleTranslation ||
       pendingAiSubjectTitleTranslation ||
@@ -1570,6 +1582,35 @@ export default function BangumiLensApp() {
       deleteHistoryPrompt ||
       clearHistoryPrompt ||
       likeHistoryPrompt
+  );
+
+  const filteredSearchEpisodes = useMemo(() => {
+    const normalizedQuery = normalizeSearchText(searchEpisodeQuery);
+    if (!normalizedQuery) return searchEpisodes;
+
+    return searchEpisodes.filter((episode) => {
+      const fields = [
+        getEpisodeChoiceLabel(episode),
+        episode.title,
+        episode.titleCn,
+        episode.airdate,
+        typeof episode.sort === "number" ? String(episode.sort) : undefined,
+        episode.id
+      ];
+      return fields
+        .filter((value): value is string => Boolean(value))
+        .some((value) => normalizeSearchText(value).includes(normalizedQuery));
+    });
+  }, [searchEpisodeQuery, searchEpisodes]);
+
+  const selectedSearchEpisodes = useMemo(
+    () => searchEpisodes.filter((episode) => selectedSearchEpisodeIds.has(episode.id)),
+    [searchEpisodes, selectedSearchEpisodeIds]
+  );
+
+  const savedSearchEpisodeIds = useMemo(
+    () => new Set(history.map((item) => getSavedReportMeta(item).episodeId).filter((episodeId): episodeId is string => Boolean(episodeId))),
+    [history]
   );
 
   const scheduleReportSwitchingEnd = useCallback(() => {
@@ -1613,6 +1654,13 @@ export default function BangumiLensApp() {
       document.body.style.overflow = previousOverflow;
     };
   }, [modalOpen]);
+
+  useEffect(() => {
+    setSelectedSearchEpisodeIds((current) => {
+      const next = new Set([...current].filter((episodeId) => !savedSearchEpisodeIds.has(episodeId)));
+      return next.size === current.size ? current : next;
+    });
+  }, [savedSearchEpisodeIds]);
 
   const openSavedReport = useCallback(async (item: SavedReport, options?: { replace?: boolean; route?: "report" | "summary" }) => {
     const currentReportUrl = report?.meta.url;
@@ -1734,6 +1782,19 @@ export default function BangumiLensApp() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pendingAutoAnalyzeUrl]);
+
+  useEffect(() => {
+    if (!pendingSearchEpisodeGeneration) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPendingSearchEpisodeGeneration(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pendingSearchEpisodeGeneration]);
 
   useEffect(() => {
     if (!searchSelectionOpen) return;
@@ -2602,6 +2663,8 @@ export default function BangumiLensApp() {
     setSearchResults([]);
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
+    setSearchEpisodeQuery("");
+    setSelectedSearchEpisodeIds(new Set());
     setSearching(true);
 
     try {
@@ -2689,6 +2752,8 @@ export default function BangumiLensApp() {
       setSearchResults([]);
       setSelectedSearchResult(null);
       setSearchEpisodes([]);
+      setSearchEpisodeQuery("");
+      setSelectedSearchEpisodeIds(new Set());
       startAnalysis(trimmedUrl);
       return;
     }
@@ -2700,6 +2765,8 @@ export default function BangumiLensApp() {
     setError("");
     setSelectedSearchResult(result);
     setSearchEpisodes([]);
+    setSearchEpisodeQuery("");
+    setSelectedSearchEpisodeIds(new Set());
     setLoadingSearchEpisodes(true);
 
     try {
@@ -2744,14 +2811,205 @@ export default function BangumiLensApp() {
     setSearchResults([]);
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
+    setSearchEpisodeQuery("");
+    setSelectedSearchEpisodeIds(new Set());
     setUrl(episode.url);
     startAnalysis(episode.url);
+  }
+
+  function toggleSearchEpisodeSelection(episodeId: string) {
+    setSelectedSearchEpisodeIds((current) => {
+      const next = new Set(current);
+      if (next.has(episodeId)) {
+        next.delete(episodeId);
+      } else {
+        next.add(episodeId);
+      }
+      return next;
+    });
+  }
+
+  function selectVisibleSearchEpisodes() {
+    setSelectedSearchEpisodeIds((current) => {
+      const next = new Set(current);
+      filteredSearchEpisodes.forEach((episode) => {
+        if (!savedSearchEpisodeIds.has(episode.id)) {
+          next.add(episode.id);
+        }
+      });
+      return next;
+    });
+  }
+
+  function clearSearchEpisodeSelection() {
+    setSelectedSearchEpisodeIds(new Set());
+  }
+
+  function prepareSelectedSearchEpisodes() {
+    if (selectedSearchEpisodes.length === 0 || !selectedSearchResult) return;
+
+    const episodesToGenerate = selectedSearchEpisodes.filter((episode) => !savedSearchEpisodeIds.has(episode.id));
+    if (episodesToGenerate.length === 0) {
+      setError("选中的章节都已经有本地报告。请直接从历史记录打开，或单独选择章节后重新生成。");
+      return;
+    }
+
+    if (episodesToGenerate.length === 1) {
+      selectSearchEpisode(episodesToGenerate[0]);
+      return;
+    }
+
+    setPendingSearchEpisodeGeneration({
+      subjectName: getSearchResultTitle(selectedSearchResult),
+      episodes: episodesToGenerate,
+      skippedCount: selectedSearchEpisodes.length - episodesToGenerate.length
+    });
+  }
+
+  async function confirmSelectedSearchEpisodes() {
+    if (!pendingSearchEpisodeGeneration) return;
+    const generationPlan = pendingSearchEpisodeGeneration;
+
+    setPendingSearchEpisodeGeneration(null);
+    setSearchResults([]);
+    setSelectedSearchResult(null);
+    setSearchEpisodes([]);
+    setSearchEpisodeQuery("");
+    setSelectedSearchEpisodeIds(new Set());
+    seasonReportGenerationCancelledRef.current = false;
+    seasonReportGenerationAbortRef.current?.abort();
+    setReport(null);
+    setShowSeasonTrend(false);
+    setSeasonTrend(null);
+    setSeasonTrendError("");
+    returningHomeRef.current = true;
+    loadedRouteReportIdRef.current = null;
+    router.push(HOME_ROUTE);
+
+    const initialItems = generationPlan.episodes.map((episode) => ({
+      id: episode.id,
+      url: episode.url,
+      label: getEpisodeChoiceLabel(episode),
+      status: "pending" as const
+    }));
+    const subjectKey = "";
+    setSeasonReportGeneration({
+      subjectKey,
+      status: "running",
+      totalCount: initialItems.length,
+      completedCount: 0,
+      failedCount: 0,
+      initialSavedReportCount: 0,
+      savedReportCount: 0,
+      requiredReportCount: initialItems.length,
+      missingReportCount: initialItems.length,
+      currentIndex: 0,
+      currentLabel: initialItems[0]?.label,
+      streamingText: "",
+      message: `正在串行生成「${generationPlan.subjectName}」选中章节报告。`,
+      items: initialItems
+    });
+
+    let completedCount = 0;
+    let failedCount = 0;
+
+    for (let index = 0; index < initialItems.length; index += 1) {
+      const item = initialItems[index];
+      if (seasonReportGenerationCancelledRef.current) break;
+
+      const abortController = new AbortController();
+      seasonReportGenerationAbortRef.current = abortController;
+      setSeasonReportGeneration((current) =>
+        current
+          ? {
+              ...current,
+              status: "running",
+              currentIndex: index,
+              currentLabel: item.label,
+              streamingText: "",
+              items: current.items.map((entry) =>
+                entry.id === item.id ? { ...entry, status: "running", error: undefined } : entry
+              )
+            }
+          : current
+      );
+
+      try {
+        const nextReport = await analyzeEpisodeReport(item.url, {
+          signal: abortController.signal,
+          onDelta: (text) => {
+            setSeasonReportGeneration((current) =>
+              current ? { ...current, streamingText: `${current.streamingText}${text}` } : current
+            );
+          }
+        });
+
+        await saveReport(nextReport, item.url, { navigate: false });
+        completedCount += 1;
+        setSeasonReportGeneration((current) =>
+          current
+            ? {
+                ...current,
+                completedCount,
+                savedReportCount: completedCount,
+                missingReportCount: Math.max(0, initialItems.length - completedCount),
+                items: current.items.map((entry) =>
+                  entry.id === item.id ? { ...entry, status: "completed" } : entry
+                )
+              }
+            : current
+        );
+      } catch (caught) {
+        if (abortController.signal.aborted || seasonReportGenerationCancelledRef.current) {
+          break;
+        }
+
+        failedCount += 1;
+        const message = caught instanceof Error ? caught.message : "生成失败，请稍后重试。";
+        setSeasonReportGeneration((current) =>
+          current
+            ? {
+                ...current,
+                failedCount,
+                items: current.items.map((entry) =>
+                  entry.id === item.id ? { ...entry, status: "failed", error: message } : entry
+                )
+              }
+            : current
+        );
+      } finally {
+        if (seasonReportGenerationAbortRef.current === abortController) {
+          seasonReportGenerationAbortRef.current = null;
+        }
+      }
+    }
+
+    const cancelled = seasonReportGenerationCancelledRef.current;
+    setSeasonReportGeneration((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        status: cancelled ? "cancelled" : failedCount > 0 ? "failed" : "completed",
+        completedCount,
+        failedCount,
+        currentLabel: undefined,
+        streamingText: "",
+        message: cancelled
+          ? "已取消生成，已完成的报告已保留。"
+          : failedCount > 0
+            ? "部分章节生成失败，已完成的报告已保留。"
+            : "选中章节报告已生成完成。"
+      };
+    });
+    seasonReportGenerationCancelledRef.current = false;
   }
 
   function closeSearchSelectionDialog() {
     setSearchResults([]);
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
+    setSearchEpisodeQuery("");
+    setSelectedSearchEpisodeIds(new Set());
     setLoadingSearchEpisodes(false);
   }
 
@@ -3119,6 +3377,13 @@ export default function BangumiLensApp() {
               <p className="recent-empty">粘贴一个 Bangumi 章节链接并生成后，报告会保存在这里，之后可以直接点开回看。</p>
             )}
           </div>
+
+          {visibleSeasonReportGeneration ? (
+            <SeasonReportGenerationProgress
+              generation={visibleSeasonReportGeneration}
+              onCancel={cancelSeasonReportGeneration}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -3351,7 +3616,11 @@ export default function BangumiLensApp() {
               <section className="search-selection-column" aria-label="章节选择">
                 <div className="search-selection-column-head">
                   <strong>章节</strong>
-                  <span>{selectedSearchResult ? getSearchResultTitle(selectedSearchResult) : "先选择作品"}</span>
+                  <span>
+                    {selectedSearchResult
+                      ? `${filteredSearchEpisodes.length} / ${searchEpisodes.length} 话，已选 ${selectedSearchEpisodes.length} 话`
+                      : "先选择作品"}
+                  </span>
                 </div>
                 {selectedSearchResult ? (
                   <div className="episode-choice-panel" aria-label="章节选择">
@@ -3361,14 +3630,85 @@ export default function BangumiLensApp() {
                         正在加载章节列表
                       </p>
                     ) : (
-                      <div className="episode-choice-list">
-                        {searchEpisodes.map((episode) => (
-                          <button key={episode.id} type="button" onClick={() => selectSearchEpisode(episode)}>
-                            <span>{getEpisodeChoiceLabel(episode)}</span>
-                            {episode.airdate ? <em>{episode.airdate}</em> : null}
+                      <>
+                        <div className="episode-choice-toolbar">
+                          <label className="episode-choice-search" htmlFor="episode-choice-search">
+                            <Search size={15} />
+                            <input
+                              id="episode-choice-search"
+                              value={searchEpisodeQuery}
+                              onChange={(event) => setSearchEpisodeQuery(event.target.value)}
+                              placeholder="搜索话数、标题或日期"
+                            />
+                            {searchEpisodeQuery ? (
+                              <button
+                                aria-label="清空章节搜索"
+                                className="episode-choice-clear"
+                                type="button"
+                                onClick={() => setSearchEpisodeQuery("")}
+                              >
+                                <X size={14} />
+                              </button>
+                            ) : null}
+                          </label>
+                          <div className="episode-choice-bulk-actions">
+                            <button
+                              type="button"
+                              onClick={selectVisibleSearchEpisodes}
+                              disabled={!filteredSearchEpisodes.some((episode) => !savedSearchEpisodeIds.has(episode.id))}
+                            >
+                              全选当前
+                            </button>
+                            <button type="button" onClick={clearSearchEpisodeSelection} disabled={selectedSearchEpisodes.length === 0}>
+                              清空
+                            </button>
+                          </div>
+                        </div>
+                        {filteredSearchEpisodes.length > 0 ? (
+                          <div className="episode-choice-list">
+                            {filteredSearchEpisodes.map((episode) => {
+                              const selected = selectedSearchEpisodeIds.has(episode.id);
+                              const saved = savedSearchEpisodeIds.has(episode.id);
+
+                              return (
+                                <div
+                                  className={[selected ? "selected" : "", saved ? "saved" : "", "episode-choice-row"]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  key={episode.id}
+                                >
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={selected}
+                                      disabled={saved}
+                                      onChange={() => toggleSearchEpisodeSelection(episode.id)}
+                                    />
+                                    <span>{getEpisodeChoiceLabel(episode)}</span>
+                                  </label>
+                                  <span className="episode-choice-meta">
+                                    <strong>{saved ? "已有报告" : "未生成"}</strong>
+                                    {episode.airdate ? <em>{episode.airdate}</em> : null}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="episode-choice-empty">没有匹配的章节。</p>
+                        )}
+                        <div className="episode-choice-footer">
+                          <span>已选 {selectedSearchEpisodes.length} 话</span>
+                          <button
+                            className="primary-action"
+                            type="button"
+                            disabled={selectedSearchEpisodes.length === 0}
+                            onClick={prepareSelectedSearchEpisodes}
+                          >
+                            生成选中章节
                           </button>
-                        ))}
-                      </div>
+                        </div>
+                      </>
                     )}
                   </div>
                 ) : (
@@ -3450,6 +3790,28 @@ export default function BangumiLensApp() {
           actions={[
             { label: "取消", onClick: () => setPendingSeasonReportGeneration(null), className: "secondary-action" },
             { label: "确认生成", onClick: confirmSeasonReportGeneration, className: "primary-action" }
+          ]}
+        />
+      ) : null}
+      {pendingSearchEpisodeGeneration ? (
+        <ConfirmDialog
+          titleId="search-episode-generation-title"
+          icon={<Sparkles size={20} />}
+          label="批量生成"
+          title="确认生成选中章节报告？"
+          description={
+            <>
+              将为《{pendingSearchEpisodeGeneration.subjectName}》串行生成 {pendingSearchEpisodeGeneration.episodes.length} 集报告。
+              {pendingSearchEpisodeGeneration.skippedCount > 0
+                ? ` 已跳过 ${pendingSearchEpisodeGeneration.skippedCount} 集已有本地报告的章节。`
+                : ""}
+              生成完成一集就保存一集，中途取消只会停止后续生成。
+            </>
+          }
+          onClose={() => setPendingSearchEpisodeGeneration(null)}
+          actions={[
+            { label: "取消", onClick: () => setPendingSearchEpisodeGeneration(null), className: "secondary-action" },
+            { label: "确认生成", onClick: confirmSelectedSearchEpisodes, className: "primary-action" }
           ]}
         />
       ) : null}

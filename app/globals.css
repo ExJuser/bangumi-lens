@@ -789,12 +789,102 @@ input {
 
 .episode-choice-panel {
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
   overflow: hidden;
   min-height: 0;
+}
+
+.episode-choice-panel > .episode-choice-toolbar,
+.episode-choice-panel > .episode-choice-footer {
+  min-width: 0;
+}
+
+.episode-choice-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.episode-choice-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 0 9px;
+}
+
+.episode-choice-search input {
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.episode-choice-search input::placeholder {
+  color: var(--muted);
+}
+
+.episode-choice-clear,
+.episode-choice-bulk-actions button,
+.episode-choice-footer button {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.episode-choice-clear {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+}
+
+.episode-choice-bulk-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.episode-choice-bulk-actions button {
+  min-height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.episode-choice-clear:hover,
+.episode-choice-clear:focus-visible,
+.episode-choice-bulk-actions button:hover,
+.episode-choice-bulk-actions button:focus-visible,
+.episode-choice-footer button:hover,
+.episode-choice-footer button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  color: var(--accent-dark);
+  outline: none;
+}
+
+.episode-choice-bulk-actions button:disabled,
+.episode-choice-footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .episode-choice-head {
@@ -841,11 +931,12 @@ input {
   padding: 8px;
 }
 
-.episode-choice-list button {
+.episode-choice-list > button,
+.episode-choice-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: center;
+  align-items: start;
   min-height: 42px;
   border: 1px solid transparent;
   border-radius: 7px;
@@ -856,28 +947,138 @@ input {
   text-align: left;
 }
 
-.episode-choice-list button:hover,
-.episode-choice-list button:focus-visible {
+.episode-choice-list > button:hover,
+.episode-choice-list > button:focus-visible,
+.episode-choice-row:hover,
+.episode-choice-row:focus-within,
+.episode-choice-row.selected {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--accent-dark);
   outline: none;
 }
 
-.episode-choice-list span {
+.episode-choice-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "title meta";
+  gap: 10px;
+  align-items: start;
+  min-height: 50px;
+}
+
+.episode-choice-row label {
+  grid-area: title;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
   min-width: 0;
-  overflow: hidden;
+  cursor: pointer;
+  padding-top: 2px;
+}
+
+.episode-choice-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.episode-choice-row input:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.episode-choice-meta {
+  grid-area: meta;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  justify-self: end;
+  min-width: 74px;
+  padding-top: 1px;
+}
+
+.episode-choice-meta strong {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.episode-choice-row.saved .episode-choice-meta strong {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent-dark);
+}
+
+.episode-choice-row label span,
+.episode-choice-list > button span {
+  min-width: 0;
   font-size: 14px;
   font-weight: 800;
   line-height: 1.35;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.episode-choice-list em {
+.episode-choice-row label span {
+  display: block;
+  overflow: visible;
+}
+
+.episode-choice-list > button span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.episode-choice-meta em {
   color: var(--muted);
   font-size: 12px;
   font-style: normal;
   font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.episode-choice-empty {
+  display: grid;
+  min-height: 140px;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.episode-choice-footer {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.episode-choice-footer span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.episode-choice-footer button {
+  min-height: 36px;
+  padding: 0 12px;
   white-space: nowrap;
 }
 
@@ -2524,6 +2725,29 @@ input {
   .search-results,
   .episode-choice-list {
     max-height: 320px;
+  }
+
+  .episode-choice-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .episode-choice-bulk-actions {
+    justify-content: flex-end;
+  }
+
+  .episode-choice-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title title"
+      "meta meta";
+  }
+
+  .episode-choice-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    justify-self: start;
+    width: 100%;
   }
 
   .metrics {
