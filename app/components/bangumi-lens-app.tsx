@@ -309,6 +309,7 @@ type SearchResult = {
   title: string;
   titleCn?: string;
   episodeTotal?: number;
+  subjectInfo?: SubjectInfo;
   firstEpisodeId: string;
   firstEpisodeTitle?: string;
   firstEpisodeNumber?: number;
@@ -1608,6 +1609,7 @@ export default function BangumiLensApp() {
   const returningHomeRef = useRef(false);
   const reportSwitchingFrameRef = useRef<number | null>(null);
   const reportSwitchingTimeoutRef = useRef<number | null>(null);
+  const searchEpisodeRequestSeqRef = useRef(0);
   const currentSubjectKey = report ? getSubjectKey(report) : "";
   const summaryRoute = isSummaryPath(pathname);
   const visibleSeasonReportGeneration =
@@ -2712,6 +2714,12 @@ export default function BangumiLensApp() {
         throw new Error("没有找到匹配的 Bangumi 条目，请试试更完整的作品名。");
       }
 
+      const subjectInfoEntries = results
+        .filter((result): result is SearchResult & { subjectInfo: SubjectInfo } => Boolean(result.subjectInfo))
+        .map((result) => [result.subjectId, result.subjectInfo] as const);
+      if (subjectInfoEntries.length > 0) {
+        setSubjectInfoById((current) => ({ ...current, ...Object.fromEntries(subjectInfoEntries) }));
+      }
       setSearchResults(results);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "搜索失败，请稍后重试。");
@@ -2795,18 +2803,25 @@ export default function BangumiLensApp() {
   }
 
   async function selectSearchResult(result: SearchResult) {
+    const requestSeq = searchEpisodeRequestSeqRef.current + 1;
+    searchEpisodeRequestSeqRef.current = requestSeq;
+    const isCurrentRequest = () => searchEpisodeRequestSeqRef.current === requestSeq;
+
     setSearchSelectionError("");
     setSelectedSearchResult(result);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
     setSelectedSearchEpisodeIds(new Set());
-    setLoadingSearchEpisodes(true);
+    setLoadingSearchEpisodes(false);
 
     try {
-      const cachedInfo = subjectInfoById[result.subjectId];
+      const cachedInfo = result.subjectInfo || subjectInfoById[result.subjectId];
       let subjectInfo = cachedInfo;
 
-      if (!subjectInfo?.episodes) {
+      if (!Array.isArray(subjectInfo?.episodes)) {
+        if (isCurrentRequest()) {
+          setLoadingSearchEpisodes(true);
+        }
         const response = await fetch(`/api/subject-info?subjectId=${encodeURIComponent(result.subjectId)}`, {
           cache: "no-store"
         });
@@ -2832,11 +2847,17 @@ export default function BangumiLensApp() {
         throw new Error("这个条目暂时没有可选择的正片章节。");
       }
 
-      setSearchEpisodes(episodes);
+      if (isCurrentRequest()) {
+        setSearchEpisodes(episodes);
+      }
     } catch (caught) {
-      setSearchSelectionError(caught instanceof Error ? caught.message : "章节列表加载失败，请稍后重试。");
+      if (isCurrentRequest()) {
+        setSearchSelectionError(caught instanceof Error ? caught.message : "章节列表加载失败，请稍后重试。");
+      }
     } finally {
-      setLoadingSearchEpisodes(false);
+      if (isCurrentRequest()) {
+        setLoadingSearchEpisodes(false);
+      }
     }
   }
 

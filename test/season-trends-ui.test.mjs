@@ -81,6 +81,56 @@ test("season generation filters cached episode lists by official episode total",
   assert.match(source, /isWithinMainEpisodeTotal\(episode, subjectInfo\?\.episodeTotal \?\? result\.episodeTotal\)/);
 });
 
+test("episode picker ignores stale subject info responses", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const selectionBody = source.slice(
+    source.indexOf("async function selectSearchResult"),
+    source.indexOf("function selectSearchEpisode")
+  );
+
+  assert.match(source, /const searchEpisodeRequestSeqRef = useRef\(0\)/);
+  assert.match(selectionBody, /searchEpisodeRequestSeqRef\.current = requestSeq/);
+  assert.match(selectionBody, /const isCurrentRequest = \(\) => searchEpisodeRequestSeqRef\.current === requestSeq/);
+  assert.match(selectionBody, /if \(isCurrentRequest\(\)\) \{\s*setSearchEpisodes\(episodes\);/);
+  assert.match(selectionBody, /if \(isCurrentRequest\(\)\) \{\s*setSearchSelectionError\(/);
+  assert.match(selectionBody, /if \(isCurrentRequest\(\)\) \{\s*setLoadingSearchEpisodes\(false\);/);
+});
+
+test("episode picker reuses cached empty subject episode lists without loading", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const selectionBody = source.slice(
+    source.indexOf("async function selectSearchResult"),
+    source.indexOf("function selectSearchEpisode")
+  );
+  const fetchCondition = selectionBody.slice(
+    selectionBody.indexOf("if (!Array.isArray(subjectInfo?.episodes))"),
+    selectionBody.indexOf("const response = await fetch")
+  );
+
+  assert.match(selectionBody, /setLoadingSearchEpisodes\(false\);/);
+  assert.match(selectionBody, /if \(!Array\.isArray\(subjectInfo\?\.episodes\)\)/);
+  assert.match(fetchCondition, /setLoadingSearchEpisodes\(true\);/);
+  assert.doesNotMatch(selectionBody, /if \(!subjectInfo\?\.episodes\)/);
+});
+
+test("title search stores subject info returned with search results", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const searchBody = source.slice(
+    source.indexOf("async function searchByTitle"),
+    source.indexOf("useEffect", source.indexOf("async function searchByTitle"))
+  );
+  const selectionBody = source.slice(
+    source.indexOf("async function selectSearchResult"),
+    source.indexOf("function selectSearchEpisode")
+  );
+
+  assert.match(source, /subjectInfo\?: SubjectInfo/);
+  assert.match(searchBody, /const subjectInfoEntries = results/);
+  assert.match(searchBody, /result is SearchResult & \{ subjectInfo: SubjectInfo \}/);
+  assert.match(searchBody, /setSubjectInfoById\(\(current\) => \(\{ \.\.\.current, \.\.\.Object\.fromEntries\(subjectInfoEntries\) \}\)\)/);
+  assert.match(selectionBody, /const cachedInfo = result\.subjectInfo \|\| subjectInfoById\[result\.subjectId\]/);
+});
+
 test("episode picker search only matches titles and exact arabic episode numbers", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const matcherBody = source.slice(

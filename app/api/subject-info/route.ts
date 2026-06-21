@@ -2,35 +2,18 @@ import { NextResponse } from "next/server";
 import { fetchBangumiSubjectInfo } from "@/lib/bangumi";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { readServerCache, writeServerCache } from "@/lib/server-cache";
+import {
+  CachedSubjectInfoPayload,
+  hasCurrentSubjectInfoCacheSchema,
+  hasSubjectInfoEpisodeListField,
+  isSubjectInfoEpisodeTotalConsistent,
+  SUBJECT_INFO_CACHE_NAMESPACE,
+  SUBJECT_INFO_CACHE_SCHEMA_VERSION,
+  SUBJECT_INFO_CACHE_TTL_MS
+} from "@/lib/subject-info-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type SubjectInfoPayload = Awaited<ReturnType<typeof fetchBangumiSubjectInfo>>;
-
-const SUBJECT_INFO_CACHE_NAMESPACE = "bangumi-subject-info";
-const SUBJECT_INFO_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const SUBJECT_INFO_CACHE_SCHEMA_VERSION = 2;
-
-type CachedSubjectInfoPayload = SubjectInfoPayload & {
-  cacheSchemaVersion?: number;
-};
-
-function hasEpisodeListField(subjectInfo: SubjectInfoPayload | undefined) {
-  return Array.isArray(subjectInfo?.episodes);
-}
-
-function hasCurrentCacheSchema(subjectInfo: CachedSubjectInfoPayload | undefined) {
-  return subjectInfo?.cacheSchemaVersion === SUBJECT_INFO_CACHE_SCHEMA_VERSION;
-}
-
-function isEpisodeTotalConsistent(subjectInfo: SubjectInfoPayload | undefined) {
-  if (!subjectInfo || typeof subjectInfo.episodeTotal !== "number" || !hasEpisodeListField(subjectInfo)) return true;
-  const episodes = subjectInfo.episodes || [];
-  return episodes.every(
-    (episode) => typeof episode.sort !== "number" || episode.sort <= subjectInfo.episodeTotal!
-  );
-}
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
@@ -47,7 +30,12 @@ export async function GET(request: Request) {
       subjectId,
       SUBJECT_INFO_CACHE_TTL_MS
     );
-    if (cached && hasCurrentCacheSchema(cached) && hasEpisodeListField(cached) && isEpisodeTotalConsistent(cached)) {
+    if (
+      cached &&
+      hasCurrentSubjectInfoCacheSchema(cached) &&
+      hasSubjectInfoEpisodeListField(cached) &&
+      isSubjectInfoEpisodeTotalConsistent(cached)
+    ) {
       await appendAppLog("info", "subject-info.request.cache_hit", {
         subjectId,
         durationMs: Date.now() - startedAt

@@ -37,11 +37,24 @@ test("season trend AI summary is only exposed through explicit POST route", () =
 test("subject info API refreshes old cache entries without episode lists but reuses empty lists", () => {
   const routePath = join(process.cwd(), "app", "api", "subject-info", "route.ts");
   const source = readFileSync(routePath, "utf8");
+  const cacheSource = readFileSync(join(process.cwd(), "lib", "subject-info-cache.ts"), "utf8");
 
-  assert.match(source, /function hasEpisodeListField/);
-  assert.match(source, /Array\.isArray\(subjectInfo\?\.episodes\)/);
-  assert.doesNotMatch(source, /subjectInfo\.episodes\.length > 0/);
-  assert.match(source, /SUBJECT_INFO_CACHE_SCHEMA_VERSION = 2/);
-  assert.match(source, /hasCurrentCacheSchema\(cached\)/);
+  assert.match(cacheSource, /function hasSubjectInfoEpisodeListField/);
+  assert.match(cacheSource, /Array\.isArray\(subjectInfo\?\.episodes\)/);
+  assert.doesNotMatch(cacheSource, /subjectInfo\.episodes\.length > 0/);
+  assert.match(cacheSource, /SUBJECT_INFO_CACHE_SCHEMA_VERSION = 2/);
+  assert.match(source, /hasCurrentSubjectInfoCacheSchema\(cached\)/);
   assert.match(source, /cacheSchemaVersion: SUBJECT_INFO_CACHE_SCHEMA_VERSION/);
+});
+
+test("search API attaches cached empty subject episode lists to results", () => {
+  const source = readFileSync(join(process.cwd(), "app", "api", "search", "route.ts"), "utf8");
+
+  assert.match(source, /subjectInfo\?: SubjectInfoPayload/);
+  assert.match(source, /async function attachCachedSubjectInfo/);
+  assert.match(source, /readServerCache<CachedSubjectInfoPayload>\(\s*SUBJECT_INFO_CACHE_NAMESPACE/);
+  assert.match(source, /hasSubjectInfoEpisodeListField\(cached\)/);
+  assert.match(source, /subjectInfo: cached/);
+  assert.match(source, /await attachCachedSubjectInfo\(cached\.results\)/);
+  assert.match(source, /await attachCachedSubjectInfo\(diskCached\)/);
 });

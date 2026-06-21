@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { configureServerProxy } from "@/lib/proxy";
 import { readServerCache, writeServerCache } from "@/lib/server-cache";
+import {
+  CachedSubjectInfoPayload,
+  hasCurrentSubjectInfoCacheSchema,
+  hasSubjectInfoEpisodeListField,
+  isSubjectInfoEpisodeTotalConsistent,
+  SubjectInfoPayload,
+  SUBJECT_INFO_CACHE_NAMESPACE,
+  SUBJECT_INFO_CACHE_TTL_MS
+} from "@/lib/subject-info-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +37,7 @@ export type SearchResult = {
   title: string;
   titleCn?: string;
   episodeTotal?: number;
+  subjectInfo?: SubjectInfoPayload;
   firstEpisodeId: string;
   firstEpisodeTitle?: string;
   firstEpisodeNumber?: number;
@@ -123,6 +133,35 @@ async function buildSearchResults(query: string) {
   return results.filter((result): result is SearchResult => Boolean(result));
 }
 
+function isReusableSubjectInfoCache(cached: CachedSubjectInfoPayload | undefined) {
+  return (
+    cached &&
+    hasCurrentSubjectInfoCacheSchema(cached) &&
+    hasSubjectInfoEpisodeListField(cached) &&
+    isSubjectInfoEpisodeTotalConsistent(cached)
+  );
+}
+
+async function attachCachedSubjectInfo(results: SearchResult[]) {
+  const enrichedResults = await Promise.all(
+    results.map(async (result) => {
+      const cached = await readServerCache<CachedSubjectInfoPayload>(
+        SUBJECT_INFO_CACHE_NAMESPACE,
+        result.subjectId,
+        SUBJECT_INFO_CACHE_TTL_MS
+      );
+      if (!isReusableSubjectInfoCache(cached)) return result;
+
+      return {
+        ...result,
+        subjectInfo: cached
+      };
+    })
+  );
+
+  return enrichedResults;
+}
+
 export async function GET(request: Request) {
   const startedAt = Date.now();
   const query = new URL(request.url).searchParams.get("q") || "";
@@ -134,13 +173,13 @@ export async function GET(request: Request) {
 
   const cached = cache.get(normalizedQuery);
   if (cached && cached.expiresAt > Date.now()) {
-    return NextResponse.json({ results: cached.results, cached: true });
+    return NextResponse.json({ results: await attachCachedSubjectInfo(cached.results), cached: true });
   }
 
   const diskCached = await readServerCache<SearchResult[]>(SEARCH_CACHE_NAMESPACE, normalizedQuery, SEARCH_CACHE_TTL_MS);
   if (diskCached?.length) {
     cache.set(normalizedQuery, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, results: diskCached });
-    return NextResponse.json({ results: diskCached, cached: true });
+    return NextResponse.json({ results: await attachCachedSubjectInfo(diskCached), cached: true });
   }
 
   try {
@@ -155,7 +194,7 @@ export async function GET(request: Request) {
       durationMs: Date.now() - startedAt
     });
 
-    return NextResponse.json({ results, cached: false });
+    return NextResponse.json({ results: await attachCachedSubjectInfo(results), cached: false });
   } catch (error) {
     await appendAppLog("error", "search.request.failed", {
       query: normalizedQuery,
