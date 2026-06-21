@@ -329,6 +329,7 @@ type SearchEpisodeChoice = EpisodeAvailabilitySignals & {
 };
 
 const NO_SEARCH_EPISODES_MESSAGE = "这个条目暂时没有可选择的正片章节。";
+const SEARCH_EPISODE_PAGE_SIZE = 8;
 
 type RatingSummary = NonNullable<Report["meta"]["rating"]>;
 
@@ -1599,6 +1600,7 @@ export default function BangumiLensApp() {
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
   const [searchEpisodeQuery, setSearchEpisodeQuery] = useState("");
+  const [searchEpisodePage, setSearchEpisodePage] = useState(1);
   const [selectedSearchEpisodeIds, setSelectedSearchEpisodeIds] = useState<Set<string>>(() => new Set());
   const [searchSelectionError, setSearchSelectionError] = useState("");
   const [pendingSearchEpisodeGeneration, setPendingSearchEpisodeGeneration] =
@@ -1657,10 +1659,27 @@ export default function BangumiLensApp() {
     return filterSearchEpisodes(searchEpisodes, searchEpisodeQuery);
   }, [searchEpisodeQuery, searchEpisodes]);
 
+  const searchEpisodePageCount = Math.max(1, Math.ceil(filteredSearchEpisodes.length / SEARCH_EPISODE_PAGE_SIZE));
+  const normalizedSearchEpisodePage = Math.min(searchEpisodePage, searchEpisodePageCount);
+  const pagedSearchEpisodes = filteredSearchEpisodes.slice(
+    (normalizedSearchEpisodePage - 1) * SEARCH_EPISODE_PAGE_SIZE,
+    normalizedSearchEpisodePage * SEARCH_EPISODE_PAGE_SIZE
+  );
+  const hasPreviousSearchEpisodePage = normalizedSearchEpisodePage > 1;
+  const hasNextSearchEpisodePage = normalizedSearchEpisodePage < searchEpisodePageCount;
+
   const selectedSearchEpisodes = useMemo(
     () => searchEpisodes.filter((episode) => selectedSearchEpisodeIds.has(episode.id)),
     [searchEpisodes, selectedSearchEpisodeIds]
   );
+
+  useEffect(() => {
+    setSearchEpisodePage((current) => Math.min(current, searchEpisodePageCount));
+  }, [searchEpisodePageCount]);
+
+  useEffect(() => {
+    setSearchEpisodePage(1);
+  }, [searchEpisodeQuery]);
 
   const savedSearchEpisodeIds = useMemo(
     () => new Set(history.map((item) => getSavedReportMeta(item).episodeId).filter((episodeId): episodeId is string => Boolean(episodeId))),
@@ -1978,6 +1997,7 @@ export default function BangumiLensApp() {
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
+    setSearchEpisodePage(1);
     setSelectedSearchEpisodeIds(new Set());
     setSearchSelectionError("");
     setShowSeasonTrend(false);
@@ -2726,6 +2746,7 @@ export default function BangumiLensApp() {
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
+    setSearchEpisodePage(1);
     setSelectedSearchEpisodeIds(new Set());
     setSearchSelectionError("");
     setSearching(true);
@@ -2840,6 +2861,7 @@ export default function BangumiLensApp() {
       setSelectedSearchResult(null);
       setSearchEpisodes([]);
       setSearchEpisodeQuery("");
+      setSearchEpisodePage(1);
       setSelectedSearchEpisodeIds(new Set());
       startAnalysis(trimmedUrl);
       return;
@@ -2858,6 +2880,7 @@ export default function BangumiLensApp() {
     setSelectedSearchResult(result);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
+    setSearchEpisodePage(1);
     setSelectedSearchEpisodeIds(new Set());
     setLoadingSearchEpisodes(false);
 
@@ -2926,6 +2949,7 @@ export default function BangumiLensApp() {
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
+    setSearchEpisodePage(1);
     setSelectedSearchEpisodeIds(new Set());
     setSearchSelectionError("");
     setUrl(episode.url);
@@ -2947,7 +2971,7 @@ export default function BangumiLensApp() {
   function selectVisibleSearchEpisodes() {
     setSelectedSearchEpisodeIds((current) => {
       const next = new Set(current);
-      filteredSearchEpisodes.forEach((episode) => {
+      pagedSearchEpisodes.forEach((episode) => {
         if (!savedSearchEpisodeIds.has(episode.id)) {
           next.add(episode.id);
         }
@@ -2959,6 +2983,10 @@ export default function BangumiLensApp() {
   function clearSearchEpisodeSelection() {
     setSelectedSearchEpisodeIds(new Set());
   }
+
+  function goToSearchEpisodePage(page: number) {
+    setSearchEpisodePage(Math.min(Math.max(1, page), searchEpisodePageCount));
+   }
 
   function prepareSelectedSearchEpisodes() {
     if (selectedSearchEpisodes.length === 0 || !selectedSearchResult) return;
@@ -2991,6 +3019,7 @@ export default function BangumiLensApp() {
     setSelectedSearchResult(null);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
+    setSearchEpisodePage(1);
     setSelectedSearchEpisodeIds(new Set());
     setSearchSelectionError("");
     seasonReportGenerationCancelledRef.current = false;
@@ -3817,7 +3846,7 @@ export default function BangumiLensApp() {
                             <button
                               type="button"
                               onClick={selectVisibleSearchEpisodes}
-                              disabled={!filteredSearchEpisodes.some((episode) => !savedSearchEpisodeIds.has(episode.id))}
+                              disabled={!pagedSearchEpisodes.some((episode) => !savedSearchEpisodeIds.has(episode.id))}
                             >
                               全选当前
                             </button>
@@ -3828,7 +3857,7 @@ export default function BangumiLensApp() {
                         </div>
                         {filteredSearchEpisodes.length > 0 ? (
                           <div className="episode-choice-list">
-                            {filteredSearchEpisodes.map((episode) => {
+                            {pagedSearchEpisodes.map((episode) => {
                               const selected = selectedSearchEpisodeIds.has(episode.id);
                               const saved = savedSearchEpisodeIds.has(episode.id);
                               const episodeInputId = `episode-choice-${episode.id}`;
@@ -3862,6 +3891,29 @@ export default function BangumiLensApp() {
                         ) : (
                           <p className="episode-choice-empty">没有匹配的章节。</p>
                         )}
+                        {filteredSearchEpisodes.length > SEARCH_EPISODE_PAGE_SIZE ? (
+                          <div className="episode-pagination" aria-label="章节分页">
+                            <button
+                              type="button"
+                              onClick={() => goToSearchEpisodePage(normalizedSearchEpisodePage - 1)}
+                              disabled={!hasPreviousSearchEpisodePage}
+                            >
+                              <ChevronLeft size={14} />
+                              上一页
+                            </button>
+                            <span>
+                              {normalizedSearchEpisodePage} / {searchEpisodePageCount}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => goToSearchEpisodePage(normalizedSearchEpisodePage + 1)}
+                              disabled={!hasNextSearchEpisodePage}
+                            >
+                              下一页
+                              <ChevronRight size={14} />
+                            </button>
+                          </div>
+                        ) : null}
                         <div className="episode-choice-footer">
                           <span>已选 {selectedSearchEpisodes.length} 话</span>
                           <button

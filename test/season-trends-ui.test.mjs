@@ -186,6 +186,24 @@ test("episode picker search only matches titles and exact arabic episode numbers
   assert.doesNotMatch(matcherBody, /getEpisodeChoiceLabel/);
 });
 
+test("episode picker paginates large episode lists and selects only the current page", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const selectVisibleBody = source.slice(
+    source.indexOf("function selectVisibleSearchEpisodes"),
+    source.indexOf("function clearSearchEpisodeSelection")
+  );
+
+  assert.match(source, /const SEARCH_EPISODE_PAGE_SIZE = 8/);
+  assert.match(source, /const pagedSearchEpisodes = filteredSearchEpisodes\.slice/);
+  assert.match(selectVisibleBody, /pagedSearchEpisodes\.forEach/);
+  assert.match(source, /function goToSearchEpisodePage\(page: number\)/);
+  assert.match(source, /className="episode-pagination"/);
+  assert.match(source, /pagedSearchEpisodes\.map/);
+  assert.match(css, /\.episode-choice-panel\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\) auto auto;/);
+  assert.match(css, /\.episode-pagination\s*\{[\s\S]*?border-top:\s*1px solid var\(--line\);/);
+});
+
 test("season report generation progress shows active in-flight progress", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
