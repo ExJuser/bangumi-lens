@@ -183,6 +183,7 @@ test("history status reads lightweight index state by normalized episode URL", a
     assert.equal(status.savedAt, history[0].savedAt);
     assert.equal(status.liked, true);
     assert.equal(status.stale, false);
+    assert.equal(status.reportUrl, `/reports/${encodeURIComponent(history[0].id)}`);
   });
 });
 

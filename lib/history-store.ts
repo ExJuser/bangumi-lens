@@ -26,6 +26,7 @@ export type HistoryReportStatus = {
   savedAt?: string;
   liked?: boolean;
   stale?: boolean;
+  reportUrl?: string;
 };
 
 const LEGACY_HISTORY_FILE = path.join(process.cwd(), "data", "reports.json");
@@ -254,6 +255,7 @@ export async function readHistoryReportStatus(inputUrl: string): Promise<History
     id: item.id,
     savedAt: item.savedAt,
     liked: Boolean(item.likedAt),
-    stale
+    stale,
+    reportUrl: `/reports/${encodeURIComponent(item.id)}`
   };
 }

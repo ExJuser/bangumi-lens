@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bangumi Lens episode analyzer
 // @namespace    https://github.com/local/bangumi-lens
-// @version      0.2.0
-// @description  Add a Bangumi Lens analyze button to Bangumi episode pages.
+// @version      0.3.0
+// @description  Add Bangumi Lens report status and analyze actions to Bangumi episode pages.
 // @match        https://bgm.tv/ep/*
 // @match        https://www.bgm.tv/ep/*
 // @match        https://bangumi.tv/ep/*
@@ -42,6 +42,13 @@
     return getAppOrigin() + "/reports/" + encodeURIComponent(reportId);
   }
 
+  function resolveReportUrl(status) {
+    if (status.reportUrl) {
+      return new URL(status.reportUrl, getAppOrigin()).toString();
+    }
+    return status.id ? buildReportUrl(status.id) : "";
+  }
+
   function buildStatusUrl(episodeUrl) {
     var url = new URL(getAppOrigin() + "/api/history/status");
     url.searchParams.set("url", episodeUrl);
@@ -51,6 +58,8 @@
   function styleHost(host) {
     host.style.display = "inline-flex";
     host.style.alignItems = "center";
+    host.style.gap = "6px";
+    host.style.flexWrap = "wrap";
     host.style.verticalAlign = "middle";
     host.style.marginLeft = "8px";
   }
@@ -83,6 +92,24 @@
     button.style.lineHeight = "1";
     button.style.textDecoration = "none";
     button.style.boxSizing = "border-box";
+    button.style.cursor = "pointer";
+  }
+
+  function styleSecondaryLink(link) {
+    link.style.display = "inline-flex";
+    link.style.alignItems = "center";
+    link.style.justifyContent = "center";
+    link.style.minHeight = "24px";
+    link.style.padding = "0 8px";
+    link.style.border = "1px solid rgba(73,105,143,0.34)";
+    link.style.borderRadius = "6px";
+    link.style.background = "#f7fbff";
+    link.style.color = "#315f9f";
+    link.style.fontWeight = "700";
+    link.style.fontSize = "11px";
+    link.style.lineHeight = "1";
+    link.style.textDecoration = "none";
+    link.style.boxSizing = "border-box";
   }
 
   function styleBadge(badge, background, border, color) {
@@ -135,6 +162,35 @@
     }
 
     return badge;
+  }
+
+  function formatSavedAt(savedAt) {
+    if (!savedAt) return "";
+    var date = new Date(savedAt);
+    if (!Number.isFinite(date.getTime())) return "";
+    return date.toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function createActionLink(text, href, primary) {
+    var link = document.createElement("a");
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = text;
+    if (primary) {
+      styleButton(link);
+      link.style.minHeight = "24px";
+      link.style.padding = "0 8px";
+      link.style.fontSize = "11px";
+    } else {
+      styleSecondaryLink(link);
+    }
+    return link;
   }
 
   function findOtherEpisodesTarget() {
@@ -204,10 +260,14 @@
 
   function updateStatus(button, status) {
     var container;
+    var reportUrl;
+    var savedAtLabel;
     if (!status || !status.exists || !status.id) return;
 
-    button.textContent = "\u67e5\u770b Lens \u62a5\u544a";
-    button.href = buildReportUrl(status.id);
+    reportUrl = resolveReportUrl(status);
+    savedAtLabel = formatSavedAt(status.savedAt);
+    button.textContent = "\u91cd\u65b0\u751f\u6210";
+    button.href = buildAnalyzeUrl(getEpisodeUrl());
 
     container = document.getElementById(STATUS_ID);
     if (!container) {
@@ -215,6 +275,8 @@
       container.id = STATUS_ID;
       container.style.display = "inline-flex";
       container.style.alignItems = "center";
+      container.style.gap = "6px";
+      container.style.flexWrap = "wrap";
       container.style.verticalAlign = "middle";
       button.insertAdjacentElement("afterend", container);
     }
@@ -223,6 +285,9 @@
     container.appendChild(createStatusBadge("\u5df2\u4fdd\u5b58", "saved"));
     if (status.liked) container.appendChild(createStatusBadge("\u5df2\u559c\u6b22", "liked"));
     if (status.stale) container.appendChild(createStatusBadge("\u9700\u5237\u65b0", "stale"));
+    if (savedAtLabel) container.appendChild(createStatusBadge(savedAtLabel, status.stale ? "stale" : "saved"));
+    if (reportUrl) container.appendChild(createActionLink("\u6253\u5f00\u62a5\u544a", reportUrl, true));
+    container.appendChild(createActionLink("\u91cd\u65b0\u751f\u6210", buildAnalyzeUrl(getEpisodeUrl()), false));
   }
 
   function refreshStatus(button, episodeUrl) {
