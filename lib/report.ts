@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import { loadReportPrompt } from "@/lib/report-prompt";
+import { loadReportPrompt, resolveReportPromptPreset } from "@/lib/report-prompt";
 import { configureServerProxy, createHttpsProxyAgent } from "@/lib/proxy";
 import { buildReportStats } from "@/lib/report-stats";
 import type { AnalyzeReport, EpisodeMeta, ReportItem, ReportSourceEvidence, WeightedComment } from "@/lib/types";
@@ -156,9 +156,9 @@ function requireModelApiKey() {
   return apiKey;
 }
 
-function createMessages(meta: EpisodeMeta, comments: WeightedComment[], webContext: WebSearchResult[] = []) {
+function createMessages(meta: EpisodeMeta, comments: WeightedComment[], webContext: WebSearchResult[] = [], presetId?: string) {
   const digest = buildCommentDigest(comments);
-  const prompt = loadReportPrompt(responseJsonSchema());
+  const prompt = loadReportPrompt(responseJsonSchema(), presetId);
 
   return [
     {
@@ -307,8 +307,9 @@ export async function refineSeasonTrendSummary(trends: SeasonTrendPayload) {
   return summary;
 }
 
-export function parseReportOutput(outputText: string, meta: EpisodeMeta, comments: WeightedComment[]): AnalyzeReport {
+export function parseReportOutput(outputText: string, meta: EpisodeMeta, comments: WeightedComment[], presetId?: string): AnalyzeReport {
   const parsed = reportSchema.parse(JSON.parse(outputText));
+  const preset = resolveReportPromptPreset(presetId);
 
   return {
     ...parsed,
@@ -317,6 +318,10 @@ export function parseReportOutput(outputText: string, meta: EpisodeMeta, comment
     discussionHotspots: enrichReportItemsWithEvidence(parsed.discussionHotspots, comments, meta),
     resonancePoints: enrichReportItemsWithEvidence(parsed.resonancePoints, comments, meta),
     generatedAt: new Date().toISOString(),
+    promptPreset: {
+      id: preset.id,
+      name: preset.name
+    },
     meta,
     stats: buildReportStats(comments)
   };
@@ -325,7 +330,8 @@ export function parseReportOutput(outputText: string, meta: EpisodeMeta, comment
 export async function createReportStream(
   meta: EpisodeMeta,
   comments: WeightedComment[],
-  webContext: WebSearchResult[] = []
+  webContext: WebSearchResult[] = [],
+  presetId?: string
 ) {
   configureServerProxy();
 
@@ -335,14 +341,14 @@ export async function createReportStream(
 
   return client.chat.completions.create({
     model,
-    messages: createMessages(meta, comments, webContext),
+    messages: createMessages(meta, comments, webContext, presetId),
     response_format: { type: "json_object" },
     stream: true,
     temperature: 0.2
   });
 }
 
-export async function generateReport(meta: EpisodeMeta, comments: WeightedComment[]): Promise<AnalyzeReport> {
+export async function generateReport(meta: EpisodeMeta, comments: WeightedComment[], presetId?: string): Promise<AnalyzeReport> {
   configureServerProxy();
 
   const apiKey = requireReportInputs(comments);
@@ -351,7 +357,7 @@ export async function generateReport(meta: EpisodeMeta, comments: WeightedCommen
 
   const response = await client.chat.completions.create({
     model,
-    messages: createMessages(meta, comments),
+    messages: createMessages(meta, comments, [], presetId),
     response_format: { type: "json_object" },
     temperature: 0.2
   });
@@ -361,5 +367,5 @@ export async function generateReport(meta: EpisodeMeta, comments: WeightedCommen
     throw new Error("DeepSeek 未返回可解析的报告内容。");
   }
 
-  return parseReportOutput(outputText, meta, comments);
+  return parseReportOutput(outputText, meta, comments, presetId);
 }

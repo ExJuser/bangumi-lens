@@ -11,6 +11,9 @@ const moduleCache = new Map();
 function requireTypeScriptModule(path) {
   const resolvedPath = extname(path) ? path : `${path}.ts`;
   assert.equal(existsSync(resolvedPath), true, `${resolvedPath} should exist`);
+  if (extname(resolvedPath) === ".json") {
+    return JSON.parse(readFileSync(resolvedPath, "utf8"));
+  }
   if (moduleCache.has(resolvedPath)) return moduleCache.get(resolvedPath).exports;
 
   const source = readFileSync(resolvedPath, "utf8");
@@ -117,5 +120,43 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
     replyCount: 3,
     reactionCount: 7,
     participantCount: 1
+  });
+});
+
+test("report prompt presets inject style instructions and fall back to default", () => {
+  const { loadReportPrompt, resolveReportPromptPreset } = requireTypeScriptModule(
+    join(process.cwd(), "lib", "report-prompt.ts")
+  );
+
+  const productionPrompt = loadReportPrompt("{}", "production_focus");
+  assert.equal(productionPrompt.preset.id, "production_focus");
+  assert.match(productionPrompt.task, /制作向/);
+  assert.match(productionPrompt.task, /productionNotes/);
+
+  const fallbackPreset = resolveReportPromptPreset("unknown");
+  assert.equal(fallbackPreset.id, "default");
+});
+
+test("parseReportOutput records the selected prompt preset", () => {
+  const { parseReportOutput } = requireTypeScriptModule(join(process.cwd(), "lib", "report.ts"));
+  const report = parseReportOutput(
+    JSON.stringify({
+      episodeSummary: "summary",
+      opinionSummary: "opinion",
+      discussionHotspots: [],
+      resonancePoints: []
+    }),
+    {
+      url: "https://bgm.tv/ep/2",
+      episodeId: "2",
+      title: "Episode 2"
+    },
+    [],
+    "brief"
+  );
+
+  assert.deepEqual(report.promptPreset, {
+    id: "brief",
+    name: "短摘要"
   });
 });

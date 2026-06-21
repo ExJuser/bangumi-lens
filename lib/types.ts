@@ -113,6 +113,10 @@ export type AnalyzeReport = {
   resonancePoints: ReportItem[];
   spoilerNotes: string[];
   generatedAt: string;
+  promptPreset?: {
+    id: string;
+    name: string;
+  };
   meta: EpisodeMeta;
   stats: {
     commentCount: number;

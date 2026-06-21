@@ -15,21 +15,23 @@ export async function POST(request: Request) {
   await appendAppLog("info", "analyze.request.start");
 
   try {
-    const body = (await request.json()) as { url?: unknown };
+    const body = (await request.json()) as { url?: unknown; promptPresetId?: unknown };
     if (typeof body.url !== "string") {
       await appendAppLog("warn", "analyze.request.invalid", { reason: "missing_url" });
       return NextResponse.json({ error: "请提供 Bangumi 章节链接。" }, { status: 400 });
     }
 
     const parsedUrl = parseBangumiEpisodeUrl(body.url);
+    const promptPresetId = typeof body.promptPresetId === "string" ? body.promptPresetId : undefined;
     await appendAppLog("info", "analyze.request.accepted", {
-      episodeId: parsedUrl.episodeId
+      episodeId: parsedUrl.episodeId,
+      promptPresetId
     });
 
     const episode = await fetchBangumiEpisode(body.url);
     const weightedComments = weightComments(episode.comments);
     const webContext = await searchEpisodeWebContext(episode.meta);
-    const stream = await createReportStream(episode.meta, weightedComments, webContext);
+    const stream = await createReportStream(episode.meta, weightedComments, webContext, promptPresetId);
 
     const encoder = new TextEncoder();
     let outputText = "";
@@ -54,11 +56,12 @@ export async function POST(request: Request) {
             send("delta", { text: delta });
           }
 
-          const report = parseReportOutput(outputText, episode.meta, weightedComments);
+          const report = parseReportOutput(outputText, episode.meta, weightedComments, promptPresetId);
           send("final", report);
           await appendAppLog("info", "analyze.request.complete", {
             subjectId: episode.meta.subjectId,
             episodeId: episode.meta.episodeId,
+            promptPresetId: report.promptPreset?.id,
             commentCount: weightedComments.length,
             webContextCount: webContext.length,
             durationMs: Date.now() - startedAt

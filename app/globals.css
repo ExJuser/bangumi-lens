@@ -858,6 +858,38 @@ input {
   padding: 0 10px;
 }
 
+.prompt-preset-control {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  gap: 7px 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.prompt-preset-control span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.prompt-preset-control select {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 9px;
+}
+
+.prompt-preset-control em {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+}
+
 .hint,
 .muted {
   color: var(--muted);

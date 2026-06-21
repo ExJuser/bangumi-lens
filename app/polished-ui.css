@@ -867,6 +867,38 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   padding: 0 10px;
 }
 
+:root[data-ui="polished"] .prompt-preset-control {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  gap: 7px 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+:root[data-ui="polished"] .prompt-preset-control span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+:root[data-ui="polished"] .prompt-preset-control select {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 9px;
+}
+
+:root[data-ui="polished"] .prompt-preset-control em {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+}
+
 :root[data-ui="polished"] .hint, :root[data-ui="polished"] .muted {
   color: var(--muted);
 }

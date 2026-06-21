@@ -88,6 +88,10 @@ type Report = {
   resonancePoints: ReportItem[];
   spoilerNotes: string[];
   generatedAt?: string;
+  promptPreset?: {
+    id: string;
+    name: string;
+  };
   meta: {
     url: string;
     episodeId: string;
@@ -216,6 +220,19 @@ type HealthStatus = {
   };
 };
 
+const PROMPT_PRESETS: { id: PromptPresetId; name: string; description: string }[] = [
+  { id: "default", name: "标准复盘", description: "结构完整，口吻克制" },
+  { id: "brief", name: "短摘要", description: "更短，更快扫读" },
+  { id: "deep_review", name: "长复盘", description: "展开观点和分歧" },
+  { id: "production_focus", name: "制作向", description: "偏演出、作画、制作线索" },
+  { id: "spoiler_safe", name: "原作避雷", description: "正文避开后续和原作信息" },
+  { id: "restrained_snark", name: "吐槽向但克制", description: "保留玩梗和吐槽信号" }
+];
+
+function isPromptPresetId(value: string): value is PromptPresetId {
+  return PROMPT_PRESETS.some((preset) => preset.id === value);
+}
+
 function HoverScrollText({ className, text }: { className?: string; text: string }) {
   const viewportRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
@@ -272,6 +289,7 @@ function HoverScrollText({ className, text }: { className?: string; text: string
 
 const THEME_STORAGE_KEY = "bangumi-lens-theme";
 const UI_MODE_STORAGE_KEY = "bangumi-lens-ui-mode";
+const PROMPT_PRESET_STORAGE_KEY = "bangumi-lens-prompt-preset";
 const HOME_ROUTE = "/home";
 const REPORT_ROUTE_PREFIX = "/reports/";
 const SUMMARY_ROUTE_PREFIX = "/summary/";
@@ -279,6 +297,7 @@ const HEALTH_ROUTE = "/health";
 const REPORT_STALE_THRESHOLD_MS = 15 * 24 * 60 * 60 * 1000;
 type ThemeMode = "day" | "night";
 type UiMode = "classic" | "polished";
+type PromptPresetId = "default" | "brief" | "deep_review" | "production_focus" | "spoiler_safe" | "restrained_snark";
 type EpisodeDirection = "previous" | "next";
 type MissingEpisodePrompt = {
   direction: EpisodeDirection;
@@ -1751,6 +1770,7 @@ function isEpisodeUnavailable(report: Report, direction: EpisodeDirection, known
 async function analyzeEpisodeReport(
   trimmedUrl: string,
   options: {
+    promptPresetId?: PromptPresetId;
     signal?: AbortSignal;
     onDelta?: (text: string) => void;
     onFinal?: (report: Report) => void;
@@ -1759,7 +1779,7 @@ async function analyzeEpisodeReport(
   const response = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: trimmedUrl }),
+    body: JSON.stringify({ url: trimmedUrl, promptPresetId: options.promptPresetId }),
     signal: options.signal
   });
 
@@ -1826,6 +1846,7 @@ export default function BangumiLensApp() {
   const [history, setHistory] = useState<SavedReport[]>([]);
   const [theme, setTheme] = useState<ThemeMode>("day");
   const [uiMode, setUiMode] = useState<UiMode>("classic");
+  const [promptPresetId, setPromptPresetId] = useState<PromptPresetId>("default");
   const [pendingDuplicate, setPendingDuplicate] = useState<SavedReport | null>(null);
   const [pendingAutoAnalyzeUrl, setPendingAutoAnalyzeUrl] = useState("");
   const [missingEpisodePrompt, setMissingEpisodePrompt] = useState<MissingEpisodePrompt | null>(null);
@@ -2127,6 +2148,11 @@ export default function BangumiLensApp() {
       } else {
         document.documentElement.dataset.ui = "classic";
       }
+
+      const savedPromptPreset = window.localStorage.getItem(PROMPT_PRESET_STORAGE_KEY);
+      if (savedPromptPreset && isPromptPresetId(savedPromptPreset)) {
+        setPromptPresetId(savedPromptPreset);
+      }
     } catch {
       document.documentElement.dataset.ui = "classic";
       // Preference loading is optional.
@@ -2306,6 +2332,11 @@ export default function BangumiLensApp() {
     setUiMode(nextUiMode);
     document.documentElement.dataset.ui = nextUiMode;
     window.localStorage.setItem(UI_MODE_STORAGE_KEY, nextUiMode);
+  }
+
+  function changePromptPreset(nextPresetId: PromptPresetId) {
+    setPromptPresetId(nextPresetId);
+    window.localStorage.setItem(PROMPT_PRESET_STORAGE_KEY, nextPresetId);
   }
 
   function goHome() {
@@ -2689,6 +2720,7 @@ export default function BangumiLensApp() {
 
       try {
         const nextReport = await analyzeEpisodeReport(item.url, {
+          promptPresetId,
           signal: abortController.signal,
           onDelta: (text) => {
             setSeasonReportGeneration((current) =>
@@ -3021,7 +3053,7 @@ export default function BangumiLensApp() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: trimmedUrl })
+        body: JSON.stringify({ url: trimmedUrl, promptPresetId })
       });
 
       if (!response.ok) {
@@ -3071,7 +3103,7 @@ export default function BangumiLensApp() {
     } finally {
       setLoading(false);
     }
-  }, [saveReport]);
+  }, [promptPresetId, saveReport]);
 
   const startAnalysis = useCallback((trimmedUrl: string) => {
     const existingReport = findExistingReport(history, trimmedUrl);
@@ -3624,6 +3656,7 @@ export default function BangumiLensApp() {
 
       try {
         const nextReport = await analyzeEpisodeReport(item.url, {
+          promptPresetId,
           signal: abortController.signal,
           onDelta: (text) => {
             setSeasonReportGeneration((current) =>
@@ -4103,6 +4136,26 @@ export default function BangumiLensApp() {
               </div>
             ) : null}
           </div>
+          <label className="prompt-preset-control" htmlFor="prompt-preset">
+            <span>报告风格</span>
+            <select
+              id="prompt-preset"
+              value={promptPresetId}
+              onChange={(event) => {
+                if (isPromptPresetId(event.target.value)) {
+                  changePromptPreset(event.target.value);
+                }
+              }}
+              disabled={loading || searching}
+            >
+              {PROMPT_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+            <em>{PROMPT_PRESETS.find((preset) => preset.id === promptPresetId)?.description}</em>
+          </label>
           <p className="hint">输入作品名会先搜索 Bangumi 条目；确认作品后再选择具体话数。已有本地报告会在选中章节后提示查看或重新生成。</p>
         </form>
       </section>
