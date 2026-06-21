@@ -692,6 +692,10 @@ input {
   gap: 10px;
 }
 
+.search-input-stack {
+  position: relative;
+}
+
 .input-row input {
   width: 100%;
   min-width: 0;
@@ -752,6 +756,98 @@ input {
 .input-row button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.search-suggestions {
+  position: absolute;
+  right: 138px;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  display: grid;
+  max-height: min(384px, 52vh);
+  overflow-y: auto;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 6px;
+  box-shadow: 0 16px 36px rgba(88, 60, 34, 0.16);
+}
+
+.search-suggestion,
+.search-suggestion-status {
+  display: grid;
+  align-items: center;
+  min-height: 58px;
+  border-radius: 7px;
+  color: var(--ink);
+}
+
+.search-suggestion {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 6px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-suggestion:hover,
+.search-suggestion:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.search-suggestion-cover {
+  display: grid;
+  width: 34px;
+  height: 46px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
+}
+
+.search-suggestion-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-suggestion-text {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.search-suggestion-text strong,
+.search-suggestion-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-suggestion-text strong {
+  font-size: 14px;
+}
+
+.search-suggestion-text span,
+.search-suggestion em,
+.search-suggestion-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.search-suggestion-status {
+  grid-template-columns: auto 1fr;
+  justify-content: start;
+  gap: 8px;
+  padding: 0 10px;
 }
 
 .hint,
@@ -3189,6 +3285,12 @@ input {
 
   .input-row {
     flex-direction: column;
+  }
+
+  .search-suggestions {
+    position: static;
+    max-height: 360px;
+    margin-top: 8px;
   }
 
   .input-row button,
