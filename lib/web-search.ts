@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { EpisodeMeta } from "@/lib/types";
+import { getBangumiUserAgent } from "@/lib/bangumi-api";
 import { configureServerProxy } from "@/lib/proxy";
 
 export type WebSearchResult = {
@@ -56,7 +57,7 @@ async function searchDuckDuckGo(query: string, kind: WebSearchResult["kind"], li
   try {
     const response = await fetch(`https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 BangumiLens/0.1",
+        "User-Agent": getBangumiUserAgent(),
         Accept: "text/html,application/xhtml+xml"
       },
       next: { revalidate: 60 * 60 }

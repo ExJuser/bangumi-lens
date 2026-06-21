@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createBangumiApiHeaders } from "@/lib/bangumi-api";
 import { appendAppLog, errorFields } from "@/lib/logger";
 import { configureServerProxy } from "@/lib/proxy";
 import { deleteServerCacheByKeyPrefix, readServerCache, writeServerCache } from "@/lib/server-cache";
@@ -52,8 +53,6 @@ type SearchPayload = {
   hasNext: boolean;
 };
 
-const USER_AGENT =
-  "BangumiLens/0.1 (+https://github.com/local/bangumi-lens; public episode comment summarizer)";
 const SEARCH_PAGE_SIZE = 8;
 const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5;
 const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -89,9 +88,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | undefi
   const response = await fetch(url, {
     ...init,
     headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "application/json",
-      "Content-Type": "application/json",
+      ...createBangumiApiHeaders({ "Content-Type": "application/json" }),
       ...init?.headers
     },
     next: { revalidate: 0 }

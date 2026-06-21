@@ -103,6 +103,8 @@ copy config\.env.example config\.env.local
 DEEPSEEK_API_KEY=sk-your-deepseek-api-key
 DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_BASE_URL=https://api.deepseek.com
+BANGUMI_USER_AGENT=your-bangumi-id/bangumi-lens/0.1.0 (https://github.com/local/bangumi-lens)
+BANGUMI_ACCESS_TOKEN=your-bangumi-access-token
 ```
 
 启动开发服务器：
@@ -183,6 +185,8 @@ public/bangumi-lens.user.js
 | `DEEPSEEK_API_KEY` | 是 | 无 | DeepSeek API Key。代码中也兼容 `OPENAI_API_KEY` 作为兜底。 |
 | `DEEPSEEK_MODEL` | 否 | `deepseek-v4-flash` | 用于生成报告、标题翻译和趋势总结的模型名。 |
 | `DEEPSEEK_BASE_URL` | 否 | `https://api.deepseek.com` | DeepSeek API 地址。 |
+| `BANGUMI_USER_AGENT` | 否 | `local/bangumi-lens/0.1.0 (https://github.com/local/bangumi-lens)` | 服务端外部请求使用的 User Agent。Bangumi 建议非浏览器 API 使用者指定开发者个人 ID 和应用名；建议把 `local` 替换为你的 Bangumi 开发者/用户 ID，并保留应用名、版本号和项目主页。 |
+| `BANGUMI_ACCESS_TOKEN` | 否 | 无 | Bangumi access token。配置后，服务端请求 `api.bgm.tv` 时会附带 `Authorization: Bearer ...`，用于获取账号可见的受限/NSFW API 数据。不会用于 Bangumi HTML 页面抓取。 |
 | `BANGUMI_LENS_PROXY` | 否 | 无 | 服务端请求 Bangumi、评分接口、网页检索和模型 API 时使用的 HTTP/HTTPS 代理。 |
 
 如果浏览器可以访问外网，但应用生成时提示 `fetch failed`，通常是 Node.js 没有读取系统代理。可以在 `config/.env.local` 中加入：
@@ -266,8 +270,9 @@ npm run lint
 
 ## 数据与隐私
 
-- 应用只读取公开 Bangumi 页面，不需要 Bangumi 登录态。
-- 应用不会读取你的 Bangumi 私有数据。
+- 应用的 Bangumi 官方 API 请求可以通过 `BANGUMI_ACCESS_TOKEN` 携带 access token，以获取该账号可见的受限/NSFW API 数据。
+- 应用会通过 `BANGUMI_USER_AGENT` 为服务端请求设置明确 User Agent，避免使用请求库默认 UA。
+- 应用抓取章节评论时仍是服务端请求 Bangumi HTML 页面，不会模拟登录浏览器，也不会读取浏览器 Cookie。
 - 报告生成需要把解析后的公开评论摘要、评分信号和网页检索摘要发送给你配置的模型 API 服务。
 - 标题翻译和整季趋势总结只有在需要模型能力并经前端确认或触发后才会调用模型 API。
 - 清空本地数据会删除本机保存的报告历史和缓存，不会影响 Bangumi 上的任何内容。

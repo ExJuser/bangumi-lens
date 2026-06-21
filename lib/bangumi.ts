@@ -8,11 +8,9 @@ import type {
   EpisodeRating,
   ScrapedEpisode
 } from "@/lib/types";
+import { createBangumiApiHeaders, createBangumiPageHeaders, getBangumiUserAgent } from "@/lib/bangumi-api";
 import { configureServerProxy } from "@/lib/proxy";
 import { parseBangumiEpisodeUrl } from "@/lib/url";
-
-const USER_AGENT =
-  "BangumiLens/0.1 (+https://github.com/local/bangumi-lens; public episode comment summarizer)";
 
 function normalizeText(text: string) {
   return text.replace(/\s+/g, " ").trim();
@@ -93,10 +91,7 @@ export async function fetchBangumiSubjectInfo(
 
   try {
     const response = await fetch(`https://api.bgm.tv/v0/subjects/${subjectId}`, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json"
-      },
+      headers: createBangumiApiHeaders(),
       next: { revalidate: 60 * 60 * 24 }
     });
 
@@ -128,10 +123,7 @@ export async function fetchBangumiSubjectTitleCn(subjectId: string) {
 
   try {
     const response = await fetch(`https://api.bgm.tv/v0/subjects/${encodeURIComponent(subjectId)}`, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json"
-      },
+      headers: createBangumiApiHeaders(),
       next: { revalidate: 60 * 60 * 24 }
     });
 
@@ -191,10 +183,7 @@ async function fetchSubjectMainEpisodes(subjectId: string, episodeTotal?: number
     const response = await fetch(
       `https://api.bgm.tv/v0/episodes?subject_id=${subjectId}&type=0&limit=${limit}&offset=${offset}`,
       {
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: "application/json"
-        },
+        headers: createBangumiApiHeaders(),
         next: { revalidate: 60 * 60 * 6 }
       }
     );
@@ -280,10 +269,7 @@ export async function fetchBangumiEpisodeTitleCn(episodeId: string) {
 
   try {
     const response = await fetch(`https://api.bgm.tv/v0/episodes/${encodeURIComponent(episodeId)}`, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json"
-      },
+      headers: createBangumiApiHeaders(),
       next: { revalidate: 60 * 60 * 24 }
     });
 
@@ -326,7 +312,7 @@ async function fetchEpisodeRating(subjectId: string | undefined, episodeId: stri
       `https://bgm-ep-ratings.deno.dev/api/v1/subjects/${subjectId}/episodes/${episodeId}/ratings`,
       {
         headers: {
-          "User-Agent": USER_AGENT,
+          "User-Agent": getBangumiUserAgent(),
           Accept: "application/json"
         },
         next: { revalidate: 60 * 10 }
@@ -592,10 +578,7 @@ export async function fetchBangumiEpisode(inputUrl: string): Promise<ScrapedEpis
 
   const { normalizedUrl, episodeId } = parseBangumiEpisodeUrl(inputUrl);
   const response = await fetch(normalizedUrl, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "text/html,application/xhtml+xml"
-    },
+    headers: createBangumiPageHeaders(),
     next: { revalidate: 0 }
   });
 
