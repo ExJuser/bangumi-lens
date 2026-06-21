@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bangumi Lens Controller</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="kicker">Bangumi Lens</p>
+          <h1>本地服务控制台</h1>
+          <p class="summary">管理开发服务、查看监听端口和进程状态，不再需要反复打开命令行窗口。</p>
+        </div>
+        <div class="status-card" data-state="loading">
+          <span class="status-dot" aria-hidden="true"></span>
+          <div>
+            <strong id="statusLabel">读取状态中</strong>
+            <span id="statusDetail">正在检查本地端口</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-grid">
+        <div class="panel main-panel">
+          <div class="metric-row">
+            <div class="metric">
+              <span>监听端口</span>
+              <strong id="portValue">-</strong>
+            </div>
+            <div class="metric">
+              <span>进程号</span>
+              <strong id="pidValue">-</strong>
+            </div>
+            <div class="metric">
+              <span>运行时长</span>
+              <strong id="uptimeValue">-</strong>
+            </div>
+          </div>
+
+          <div class="url-box">
+            <span>本地地址</span>
+            <button id="urlButton" type="button">-</button>
+          </div>
+
+          <div class="actions" aria-label="服务操作">
+            <button class="primary" id="startButton" type="button">启动服务</button>
+            <button id="restartButton" type="button">重启服务</button>
+            <button id="stopButton" type="button">停止服务</button>
+            <button id="openButton" type="button">打开 Bangumi Lens</button>
+          </div>
+        </div>
+
+        <aside class="panel side-panel">
+          <div class="section-head">
+            <h2>运行信息</h2>
+            <button id="refreshButton" type="button">刷新</button>
+          </div>
+          <dl class="info-list">
+            <div>
+              <dt>依赖</dt>
+              <dd id="dependencyValue">-</dd>
+            </div>
+            <div>
+              <dt>端口占用</dt>
+              <dd id="externalPidValue">-</dd>
+            </div>
+            <div>
+              <dt>最近错误</dt>
+              <dd id="errorValue">-</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="section-head">
+          <h2>日志预览</h2>
+          <div class="log-actions">
+            <button id="reloadLogsButton" type="button">刷新日志</button>
+            <button id="openLogsButton" type="button">打开日志目录</button>
+          </div>
+        </div>
+        <div class="logs">
+          <article>
+            <h3>dev-server.log</h3>
+            <pre id="stdoutLog">暂无日志</pre>
+          </article>
+          <article>
+            <h3>dev-server.err.log</h3>
+            <pre id="stderrLog">暂无日志</pre>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./renderer.mjs"></script>
+  </body>
+</html>
