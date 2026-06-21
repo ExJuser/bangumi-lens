@@ -115,7 +115,7 @@ export async function fetchBangumiSubjectInfo(
     const subjectRating = summarizeSubjectRating(subject.rating);
     const subjectInfo: SubjectInfo = { titleCn, episodeTotal, subjectRating };
     if (options.includeEpisodes) {
-      subjectInfo.episodes = await fetchSubjectMainEpisodes(subjectId);
+      subjectInfo.episodes = await fetchSubjectMainEpisodes(subjectId, episodeTotal);
     }
     return subjectInfo;
   } catch {
@@ -177,7 +177,12 @@ function summarizeSubjectRating(rating: unknown): EpisodeRating | undefined {
   };
 }
 
-async function fetchSubjectMainEpisodes(subjectId: string): Promise<EpisodeAvailabilitySignals[]> {
+function isWithinMainEpisodeTotal(episode: EpisodeAvailabilitySignals, episodeTotal?: number) {
+  if (typeof episodeTotal !== "number" || episodeTotal <= 0) return true;
+  return typeof episode.sort !== "number" || episode.sort <= episodeTotal;
+}
+
+async function fetchSubjectMainEpisodes(subjectId: string, episodeTotal?: number): Promise<EpisodeAvailabilitySignals[]> {
   const episodes: BangumiEpisodeApiItem[] = [];
   const limit = 100;
   let offset = 0;
@@ -208,6 +213,7 @@ async function fetchSubjectMainEpisodes(subjectId: string): Promise<EpisodeAvail
   return episodes
     .map(normalizeEpisodeApiItem)
     .filter((episode): episode is EpisodeAvailabilitySignals => Boolean(episode))
+    .filter((episode) => isWithinMainEpisodeTotal(episode, episodeTotal))
     .sort((a, b) => (a.sort ?? Number.MAX_SAFE_INTEGER) - (b.sort ?? Number.MAX_SAFE_INTEGER) || Number(a.id) - Number(b.id));
 }
 
@@ -236,11 +242,15 @@ function normalizeEpisodeApiItem(episode: BangumiEpisodeApiItem): EpisodeAvailab
   };
 }
 
-async function fetchEpisodeNavigationInfo(subjectId: string | undefined, episodeId: string): Promise<EpisodeNavigationInfo> {
+async function fetchEpisodeNavigationInfo(
+  subjectId: string | undefined,
+  episodeId: string,
+  episodeTotal?: number
+): Promise<EpisodeNavigationInfo> {
   if (!subjectId) return {};
 
   try {
-    const mainEpisodes = await fetchSubjectMainEpisodes(subjectId);
+    const mainEpisodes = await fetchSubjectMainEpisodes(subjectId, episodeTotal);
     const currentIndex = mainEpisodes.findIndex((episode) => episode.id === episodeId);
     if (currentIndex < 0) return {};
     const currentEpisode = mainEpisodes[currentIndex];
@@ -590,9 +600,9 @@ export async function fetchBangumiEpisode(inputUrl: string): Promise<ScrapedEpis
   const html = await response.text();
   const $ = cheerio.load(html);
   const subjectId = parseSubjectId($);
-  const [subjectInfo, navigationInfo, rating] = await Promise.all([
-    fetchBangumiSubjectInfo(subjectId),
-    fetchEpisodeNavigationInfo(subjectId, episodeId),
+  const subjectInfo = await fetchBangumiSubjectInfo(subjectId);
+  const [navigationInfo, rating] = await Promise.all([
+    fetchEpisodeNavigationInfo(subjectId, episodeId, subjectInfo.episodeTotal),
     fetchEpisodeRating(subjectId, episodeId)
   ]);
 

@@ -61,6 +61,26 @@ test("season trend empty state can launch cancellable full-season report generat
   assert.match(prepareBody, /setPendingSeasonReportGeneration/);
 });
 
+test("episode navigation treats official episode total as the final main episode boundary", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+  const boundaryBody = source.slice(
+    source.indexOf("function isEpisodeBoundary"),
+    source.indexOf("function getReportRoute")
+  );
+
+  assert.match(boundaryBody, /const episodeTotal = report\.meta\.episodeTotal \|\| knownEpisodeTotal/);
+  assert.match(boundaryBody, /direction === "next"/);
+  assert.match(boundaryBody, /episodeSort >= episodeTotal/);
+});
+
+test("season generation filters cached episode lists by official episode total", () => {
+  const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
+
+  assert.match(source, /function isWithinMainEpisodeTotal/);
+  assert.match(source, /isWithinMainEpisodeTotal\(episode, episodeTotal\)/);
+  assert.match(source, /isWithinMainEpisodeTotal\(episode, subjectInfo\?\.episodeTotal \?\? result\.episodeTotal\)/);
+});
+
 test("season report generation progress shows active in-flight progress", () => {
   const source = readFileSync(join(process.cwd(), "app", "components", "bangumi-lens-app.tsx"), "utf8");
   const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");

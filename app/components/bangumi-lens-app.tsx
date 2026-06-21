@@ -389,6 +389,11 @@ function getEpisodeChoiceLabel(episode: EpisodeAvailabilitySignals) {
   return title ? `${episodeNumber} ${title}` : episodeNumber;
 }
 
+function isWithinMainEpisodeTotal(episode: Pick<EpisodeAvailabilitySignals, "sort">, episodeTotal?: number) {
+  if (typeof episodeTotal !== "number" || episodeTotal <= 0) return true;
+  return typeof episode.sort !== "number" || episode.sort <= episodeTotal;
+}
+
 const EMPTY_PREVIEW_ITEMS = [
   {
     title: "剧情概览",
@@ -1307,7 +1312,9 @@ function getAdjacentEpisodeInfo(
   if (typeof currentSort !== "number") return undefined;
 
   const expectedSort = currentSort + (direction === "previous" ? -1 : 1);
-  return subjectInfo?.episodes?.find((episode) => episode.sort === expectedSort);
+  return subjectInfo?.episodes?.find(
+    (episode) => episode.sort === expectedSort && isWithinMainEpisodeTotal(episode, subjectInfo.episodeTotal)
+  );
 }
 
 function getReportFallbackEpisodes(report: Report) {
@@ -1334,10 +1341,21 @@ function getMissingEpisodePrimaryActionLabel(prompt: MissingEpisodePrompt) {
 }
 
 function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpisodeTotal?: number) {
+  const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
+  const episodeSort = report.meta.episodeSort ?? report.meta.episodeNumber;
+
+  if (
+    direction === "next" &&
+    typeof episodeTotal === "number" &&
+    episodeTotal > 0 &&
+    typeof episodeSort === "number" &&
+    episodeSort >= episodeTotal
+  ) {
+    return true;
+  }
+
   if (direction === "previous" && report.meta.previousEpisodeId === null) return true;
   if (direction === "next" && report.meta.nextEpisodeId === null) {
-    const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
-    const episodeSort = report.meta.episodeSort ?? report.meta.episodeNumber;
     return !(typeof episodeTotal === "number" && episodeTotal > 0 && typeof episodeSort === "number" && episodeSort < episodeTotal);
   }
 
@@ -1346,7 +1364,6 @@ function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpi
   }
 
   if (direction === "next" && report.meta.nextEpisodeId === undefined && typeof report.meta.episodeSort === "number") {
-    const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
     return typeof episodeTotal === "number" && episodeTotal > 0 && report.meta.episodeSort >= episodeTotal;
   }
 
@@ -1360,7 +1377,6 @@ function isEpisodeBoundary(report: Report, direction: EpisodeDirection, knownEpi
     return episodeNumber <= 1;
   }
 
-  const episodeTotal = report.meta.episodeTotal || knownEpisodeTotal;
   return typeof episodeTotal === "number" && episodeTotal > 0 && episodeNumber >= episodeTotal;
 }
 
@@ -2074,7 +2090,10 @@ export default function BangumiLensApp() {
         subjectInfo?.episodes && subjectInfo.episodes.length > 0
           ? subjectInfo.episodes
           : getReportFallbackEpisodes(currentReport);
-      const missingEpisodes = sourceEpisodes.filter((episode) => episode.id && !savedEpisodeIds.has(episode.id));
+      const episodeTotal = subjectInfo?.episodeTotal ?? currentReport.meta.episodeTotal;
+      const missingEpisodes = sourceEpisodes.filter(
+        (episode) => episode.id && isWithinMainEpisodeTotal(episode, episodeTotal) && !savedEpisodeIds.has(episode.id)
+      );
       const savedCount = seasonTrend?.savedReportCount ?? currentSubjectHistory.length;
       const candidates = missingEpisodes.map((episode) => ({
         id: episode.id,
@@ -2091,7 +2110,7 @@ export default function BangumiLensApp() {
         subjectKey,
         subjectName,
         savedReportCount: savedCount,
-        episodeTotal: subjectInfo?.episodeTotal ?? currentReport.meta.episodeTotal,
+        episodeTotal,
         candidates
       });
     } catch (caught) {
@@ -2682,10 +2701,12 @@ export default function BangumiLensApp() {
         setSubjectInfoById((current) => ({ ...current, [result.subjectId]: subjectInfo }));
       }
 
-      const episodes = (subjectInfo?.episodes || []).map((episode) => ({
-        ...episode,
-        url: buildSearchEpisodeUrl(episode.id)
-      }));
+      const episodes = (subjectInfo?.episodes || [])
+        .filter((episode) => isWithinMainEpisodeTotal(episode, subjectInfo?.episodeTotal ?? result.episodeTotal))
+        .map((episode) => ({
+          ...episode,
+          url: buildSearchEpisodeUrl(episode.id)
+        }));
       if (episodes.length === 0) {
         throw new Error("这个条目暂时没有可选择的正片章节。");
       }

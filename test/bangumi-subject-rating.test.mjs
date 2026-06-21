@@ -90,3 +90,47 @@ test("fetchBangumiSubjectInfo maps official subject rating into subjectRating", 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("fetchBangumiSubjectInfo excludes normal-list extras past the official episode total", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const href = String(url);
+    if (href.includes("/v0/subjects/")) {
+      return new Response(
+        JSON.stringify({
+          name_cn: "只有我不存在的城市",
+          total_episodes: 12,
+          rating: { score: 8, total: 1, count: { 8: 1 } }
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        total: 14,
+        data: Array.from({ length: 14 }, (_, index) => ({
+          id: 1000 + index,
+          sort: index + 1,
+          name_cn: `Episode ${index + 1}`,
+          type: 0
+        }))
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+
+  try {
+    const { fetchBangumiSubjectInfo } = requireTypeScriptModule(join(process.cwd(), "lib", "bangumi.ts"));
+    const subjectInfo = await fetchBangumiSubjectInfo("123", { includeEpisodes: true });
+
+    assert.equal(subjectInfo.episodeTotal, 12);
+    assert.equal(subjectInfo.episodes.length, 12);
+    assert.deepEqual(
+      subjectInfo.episodes.map((episode) => episode.sort),
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
