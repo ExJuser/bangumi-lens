@@ -56,15 +56,17 @@ test("search API attaches cached empty subject episode lists to results", () => 
   assert.match(source, /hasSubjectInfoEpisodeListField\(cached\)/);
   assert.match(source, /subjectInfo: cached/);
   assert.match(source, /async function attachCachedSubjectInfoToPayload/);
-  assert.match(source, /await attachCachedSubjectInfoToPayload\(cached\.payload\)/);
-  assert.match(source, /await attachCachedSubjectInfoToPayload\(diskCached\)/);
+  assert.match(source, /await attachCachedSubjectInfoToPayload\(hydrated\)/);
 });
 
 test("search API backfills pages with usable Bangumi subjects and caches pages separately", () => {
   const source = readFileSync(join(process.cwd(), "app", "api", "search", "route.ts"), "utf8");
 
   assert.match(source, /const SEARCH_PAGE_SIZE = 6/);
-  assert.match(source, /const SEARCH_CACHE_NAMESPACE = "bangumi-search-v5"/);
+  assert.match(source, /const SEARCH_INDEX_CACHE_NAMESPACE = "bangumi-search-index-v1"/);
+  assert.match(source, /const SEARCH_SUBJECT_CACHE_NAMESPACE = "bangumi-search-subject-v1"/);
+  assert.match(source, /type SearchSubjectEntity = Omit<SearchResult, "subjectInfo">/);
+  assert.match(source, /type SearchIndexPayload = Omit<SearchPayload, "results">/);
   assert.match(source, /coverPreviewUrl\?: string/);
   assert.match(source, /function getSubjectCoverPreviewUrl\(subject: BangumiSubject\)/);
   assert.match(source, /subject\.images\?\.large \|\|[\s\S]*?subject\.images\?\.grid/);
@@ -73,12 +75,15 @@ test("search API backfills pages with usable Bangumi subjects and caches pages s
   assert.match(source, /search\/subjects\?limit=\$\{SEARCH_PAGE_SIZE\}&offset=\$\{offset\}/);
   assert.match(source, /let offset = 0/);
   assert.match(source, /while \(usableResults\.length < targetUsableCount && scannedPages < maxScannedPages\)/);
-  assert.match(source, /usableResults\.push\(\.\.\.\(await buildSearchResults\(subjectPage\.subjects\)\)\)/);
+  assert.match(source, /usableResults\.push\(\.\.\.\(await buildSearchResults\(subjectPage\.subjects, options\)\)\)/);
   assert.match(source, /results: usableResults\.slice\(targetStart, targetEnd\)/);
   assert.match(source, /function buildSearchCacheKey/);
   assert.match(source, /const cacheKey = buildSearchCacheKey\(normalizedQuery, page\)/);
-  assert.match(source, /readServerCache<SearchPayload>\(SEARCH_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS\)/);
-  assert.match(source, /writeServerCache\(SEARCH_CACHE_NAMESPACE, cacheKey, payload\)/);
+  assert.match(source, /readServerCache<SearchIndexPayload>\(SEARCH_INDEX_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS\)/);
+  assert.match(source, /writeServerCache\(SEARCH_INDEX_CACHE_NAMESPACE, cacheKey, indexPayload\)/);
+  assert.match(source, /readServerCache<SearchSubjectEntity>\(\s*SEARCH_SUBJECT_CACHE_NAMESPACE/);
+  assert.match(source, /writeServerCache\(SEARCH_SUBJECT_CACHE_NAMESPACE, entity\.subjectId, entity\)/);
+  assert.match(source, /async function hydrateSearchPayload/);
   assert.match(source, /hasNext: usableResults\.length > targetEnd \|\| offset < total/);
 });
 

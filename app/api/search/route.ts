@@ -62,11 +62,19 @@ type SearchPayload = {
   hasNext: boolean;
 };
 
+type SearchSubjectEntity = Omit<SearchResult, "subjectInfo">;
+
+type SearchIndexPayload = Omit<SearchPayload, "results"> & {
+  subjectIds: string[];
+};
+
 const SEARCH_PAGE_SIZE = 6;
 const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5;
 const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const SEARCH_CACHE_NAMESPACE = "bangumi-search-v5";
-const cache = new Map<string, { expiresAt: number; payload: SearchPayload }>();
+const SEARCH_INDEX_CACHE_NAMESPACE = "bangumi-search-index-v1";
+const SEARCH_SUBJECT_CACHE_NAMESPACE = "bangumi-search-subject-v1";
+const indexCache = new Map<string, { expiresAt: number; payload: SearchIndexPayload }>();
+const subjectCache = new Map<string, { expiresAt: number; payload: SearchSubjectEntity }>();
 
 function normalizeQuery(query: string) {
   return query.trim().replace(/\s+/g, " ").toLowerCase();
@@ -164,34 +172,71 @@ async function fetchFirstEpisode(subjectId: number) {
   })[0];
 }
 
-async function buildSearchResults(subjects: BangumiSubject[]) {
+function buildSearchSubjectEntity(subject: BangumiSubject, episode: BangumiEpisode): SearchSubjectEntity | undefined {
+  if (!subject.id || !episode.id) return undefined;
+  const episodeTotal = Number(subject.eps || subject.total_episodes);
+  return {
+    subjectId: String(subject.id),
+    title: subject.name?.trim() || getSubjectTitle(subject),
+    titleCn: subject.name_cn?.trim() || undefined,
+    coverUrl: getSubjectCoverUrl(subject),
+    coverPreviewUrl: getSubjectCoverPreviewUrl(subject),
+    episodeTotal: Number.isFinite(episodeTotal) && episodeTotal > 0 ? episodeTotal : undefined,
+    firstEpisodeId: String(episode.id),
+    firstEpisodeTitle: getEpisodeTitle(episode),
+    firstEpisodeNumber: typeof episode.sort === "number" ? episode.sort : undefined,
+    url: `https://bgm.tv/ep/${episode.id}`
+  };
+}
+
+async function readSearchSubjectEntity(subjectId: string) {
+  const cached = subjectCache.get(subjectId);
+  if (cached && cached.expiresAt > Date.now()) return cached.payload;
+
+  const diskCached = await readServerCache<SearchSubjectEntity>(
+    SEARCH_SUBJECT_CACHE_NAMESPACE,
+    subjectId,
+    SEARCH_CACHE_TTL_MS
+  );
+  if (!diskCached?.firstEpisodeId) return undefined;
+
+  subjectCache.set(subjectId, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: diskCached });
+  return diskCached;
+}
+
+async function writeSearchSubjectEntity(entity: SearchSubjectEntity) {
+  subjectCache.set(entity.subjectId, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: entity });
+  await writeServerCache(SEARCH_SUBJECT_CACHE_NAMESPACE, entity.subjectId, entity);
+}
+
+async function buildSearchResults(subjects: BangumiSubject[], options: { refreshEntities?: boolean } = {}) {
   const results = await Promise.all(
     subjects.map(async (subject) => {
       if (!subject.id) return undefined;
+      const subjectId = String(subject.id);
+      if (!options.refreshEntities) {
+        const cached = await readSearchSubjectEntity(subjectId);
+        if (cached) return cached;
+      }
+
       const episode = await fetchFirstEpisode(subject.id);
       if (!episode?.id) return undefined;
 
-      const episodeTotal = Number(subject.eps || subject.total_episodes);
-      const result: SearchResult = {
-        subjectId: String(subject.id),
-        title: subject.name?.trim() || getSubjectTitle(subject),
-        titleCn: subject.name_cn?.trim() || undefined,
-        coverUrl: getSubjectCoverUrl(subject),
-        coverPreviewUrl: getSubjectCoverPreviewUrl(subject),
-        episodeTotal: Number.isFinite(episodeTotal) && episodeTotal > 0 ? episodeTotal : undefined,
-        firstEpisodeId: String(episode.id),
-        firstEpisodeTitle: getEpisodeTitle(episode),
-        firstEpisodeNumber: typeof episode.sort === "number" ? episode.sort : undefined,
-        url: `https://bgm.tv/ep/${episode.id}`
-      };
+      const result = buildSearchSubjectEntity(subject, episode);
+      if (!result) return undefined;
+      await writeSearchSubjectEntity(result);
       return result;
     })
   );
 
-  return results.filter((result): result is SearchResult => Boolean(result));
+  return results.filter((result): result is SearchSubjectEntity => Boolean(result));
 }
 
-async function buildSearchPayload(query: string, page: number): Promise<SearchPayload> {
+async function buildSearchPayload(
+  query: string,
+  page: number,
+  options: { refreshEntities?: boolean } = {}
+): Promise<SearchPayload> {
   const targetStart = (page - 1) * SEARCH_PAGE_SIZE;
   const targetEnd = page * SEARCH_PAGE_SIZE;
   const targetUsableCount = targetEnd + 1;
@@ -207,7 +252,7 @@ async function buildSearchPayload(query: string, page: number): Promise<SearchPa
     scannedPages += 1;
     if (subjectPage.subjects.length === 0) break;
 
-    usableResults.push(...(await buildSearchResults(subjectPage.subjects)));
+    usableResults.push(...(await buildSearchResults(subjectPage.subjects, options)));
     offset += SEARCH_PAGE_SIZE;
     if (offset >= total) break;
   }
@@ -218,6 +263,27 @@ async function buildSearchPayload(query: string, page: number): Promise<SearchPa
     page,
     pageSize: SEARCH_PAGE_SIZE,
     hasNext: usableResults.length > targetEnd || offset < total
+  };
+}
+
+function toSearchIndexPayload(payload: SearchPayload): SearchIndexPayload {
+  const { results, ...indexPayload } = payload;
+  return {
+    ...indexPayload,
+    subjectIds: results.map((result) => result.subjectId)
+  };
+}
+
+async function hydrateSearchPayload(indexPayload: SearchIndexPayload): Promise<SearchPayload | undefined> {
+  const results = await Promise.all(indexPayload.subjectIds.map((subjectId) => readSearchSubjectEntity(subjectId)));
+  if (results.some((result) => !result)) return undefined;
+
+  return {
+    results: results.filter((result): result is SearchSubjectEntity => Boolean(result)),
+    total: indexPayload.total,
+    page: indexPayload.page,
+    pageSize: indexPayload.pageSize,
+    hasNext: indexPayload.hasNext
   };
 }
 
@@ -272,33 +338,40 @@ export async function GET(request: Request) {
 
   if (refresh) {
     const cacheKeyPrefix = buildSearchCacheKeyPrefix(normalizedQuery);
-    for (const key of cache.keys()) {
+    for (const key of indexCache.keys()) {
       if (key.startsWith(cacheKeyPrefix)) {
-        cache.delete(key);
+        indexCache.delete(key);
       }
     }
-    await deleteServerCacheByKeyPrefix(SEARCH_CACHE_NAMESPACE, cacheKeyPrefix);
+    await deleteServerCacheByKeyPrefix(SEARCH_INDEX_CACHE_NAMESPACE, cacheKeyPrefix);
   }
 
-  const cached = cache.get(cacheKey);
+  const cached = indexCache.get(cacheKey);
   if (!refresh && cached && cached.expiresAt > Date.now()) {
-    return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(cached.payload)), cached: true });
+    const hydrated = await hydrateSearchPayload(cached.payload);
+    if (hydrated) {
+      return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(hydrated)), cached: true });
+    }
   }
 
   const diskCached = !refresh
-    ? await readServerCache<SearchPayload>(SEARCH_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS)
+    ? await readServerCache<SearchIndexPayload>(SEARCH_INDEX_CACHE_NAMESPACE, cacheKey, SEARCH_CACHE_TTL_MS)
     : undefined;
-  if (!refresh && diskCached?.results) {
-    cache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: diskCached });
-    return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(diskCached)), cached: true });
+  if (!refresh && diskCached?.subjectIds) {
+    const hydrated = await hydrateSearchPayload(diskCached);
+    if (hydrated) {
+      indexCache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: diskCached });
+      return NextResponse.json({ ...(await attachCachedSubjectInfoToPayload(hydrated)), cached: true });
+    }
   }
 
   try {
     configureServerProxy();
     await appendAppLog("info", "search.request.start", { query: normalizedQuery, page, refresh });
-    const payload = await buildSearchPayload(query.trim(), page);
-    cache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload });
-    await writeServerCache(SEARCH_CACHE_NAMESPACE, cacheKey, payload);
+    const payload = await buildSearchPayload(query.trim(), page, { refreshEntities: refresh });
+    const indexPayload = toSearchIndexPayload(payload);
+    indexCache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: indexPayload });
+    await writeServerCache(SEARCH_INDEX_CACHE_NAMESPACE, cacheKey, indexPayload);
     await appendAppLog("info", "search.request.complete", {
       query: normalizedQuery,
       page,
