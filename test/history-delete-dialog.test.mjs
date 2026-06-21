@@ -31,30 +31,37 @@ test("current episode header actions ask for confirmation before mutating histor
   );
 });
 
-test("clear all local content is tucked behind a history title icon and confirmation dialog", () => {
+test("clear local reports and cache are exposed from the health cards", () => {
   const pagePath = join(process.cwd(), "app", "components", "bangumi-lens-app.tsx");
   const cssPath = join(process.cwd(), "app", "globals.css");
   const pageSource = readFileSync(pagePath, "utf8");
   const cssSource = readFileSync(cssPath, "utf8");
 
-  assert.match(pageSource, /clearHistoryPrompt/);
-  assert.match(pageSource, /confirmClearHistory/);
-  assert.match(pageSource, /JSON\.stringify\(\{ all: true \}\)/);
-  assert.match(pageSource, /className="history-clear"/);
-  assert.match(pageSource, /title="确认清空全部报告和缓存？"/);
-  assert.match(pageSource, /全部缓存内容/);
-  assert.match(cssSource, /\.history-clear\s*\{[\s\S]*?opacity:\s*0;/);
-  assert.match(cssSource, /\.history-title:hover\s+\.history-clear/);
+  assert.match(pageSource, /clearLocalDataPrompt/);
+  assert.match(pageSource, /confirmClearLocalData/);
+  assert.match(pageSource, /JSON\.stringify\(\{ scope \}\)/);
+  assert.match(pageSource, /onClearReports=\{\(\) => setClearLocalDataPrompt\("reports"\)\}/);
+  assert.match(pageSource, /onClearCache=\{\(\) => setClearLocalDataPrompt\("cache"\)\}/);
+  assert.doesNotMatch(pageSource, /onClearReports=\{confirmClearLocalData\}/);
+  assert.doesNotMatch(pageSource, /onClearCache=\{confirmClearLocalData\}/);
+  assert.match(pageSource, /确认清空全部本地报告？/);
+  assert.match(pageSource, /确认清空全部缓存？/);
+  assert.match(pageSource, /className="health-danger-action"/);
+  assert.doesNotMatch(pageSource, /className="history-clear"/);
+  assert.doesNotMatch(cssSource, /\.history-clear\s*\{/);
+  assert.match(cssSource, /\.health-danger-action\s*\{/);
+  assert.match(cssSource, /\.health-danger-action:hover,[\s\S]*?border-color:/);
+  assert.match(cssSource, /\.health-danger-action:hover,[\s\S]*?transform:\s*translateY\(-1px\)/);
 });
 
-test("clear all local content reports success or failure after the request finishes", () => {
+test("clear local content reports success or failure after the request finishes", () => {
   const pagePath = join(process.cwd(), "app", "components", "bangumi-lens-app.tsx");
   const cssPath = join(process.cwd(), "app", "globals.css");
   const pageSource = readFileSync(pagePath, "utf8");
   const cssSource = readFileSync(cssPath, "utf8");
 
   assert.match(pageSource, /const \[notice, setNotice\] = useState\(""\)/);
-  assert.match(pageSource, /setNotice\("已清空全部报告和缓存。"\)/);
+  assert.match(pageSource, /setNotice\(scope === "reports" \? "已清空全部报告。" : "已清空全部缓存。"\)/);
   assert.match(pageSource, /setError\("清空失败，请稍后重试。"\)/);
   assert.match(pageSource, /className="notice success toast-notice"/);
   assert.match(cssSource, /\.success\s*\{[\s\S]*?border-color:/);

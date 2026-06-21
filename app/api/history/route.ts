@@ -75,13 +75,16 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const body = (await request.json()) as { id?: unknown; all?: unknown };
-  if (body.all === true) {
+  const body = (await request.json()) as { id?: unknown; all?: unknown; scope?: unknown };
+  if (body.all === true || body.scope === "reports" || body.scope === "cache") {
     const startedAt = Date.now();
+    const scope = body.all === true ? "all" : body.scope;
 
     try {
-      const [history] = await Promise.all([clearHistoryReports(), clearServerCache()]);
+      const history = scope === "cache" ? await readHistoryIndex() : await clearHistoryReports();
+      if (scope !== "reports") await clearServerCache();
       await appendAppLog("info", "local-data.clear.complete", {
+        scope,
         count: history.length,
         durationMs: Date.now() - startedAt
       });

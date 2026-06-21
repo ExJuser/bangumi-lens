@@ -205,32 +205,6 @@ textarea {
   gap: 7px;
 }
 
-.history-clear {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
-}
-
-.history-title:hover .history-clear,
-.history-title:focus-within .history-clear {
-  opacity: 1;
-}
-
-.history-clear:hover,
-.history-clear:focus-visible {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent-dark);
-  outline: none;
-}
-
 .history-groups {
   display: grid;
   gap: 8px;
@@ -2029,12 +2003,51 @@ textarea {
   gap: 14px;
 }
 
+.health-card-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 4px;
+}
+
 .health-card strong {
   display: block;
-  margin: 12px 0 4px;
   color: var(--ink);
   font-size: 30px;
   line-height: 1;
+}
+
+.health-danger-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 7%, var(--field));
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 6px 9px;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.health-danger-action:hover,
+.health-danger-action:focus-visible {
+  border-color: color-mix(in srgb, var(--danger) 72%, var(--line));
+  background: color-mix(in srgb, var(--danger) 16%, var(--field));
+  color: color-mix(in srgb, var(--danger) 78%, var(--ink));
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.health-danger-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
 }
 
 .health-config-grid {

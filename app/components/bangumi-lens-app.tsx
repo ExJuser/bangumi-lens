@@ -230,6 +230,8 @@ type HealthStatus = {
   };
 };
 
+type ClearLocalDataScope = "reports" | "cache";
+
 const PROMPT_PRESETS: { id: PromptPresetId; name: string; description: string }[] = [
   { id: "default", name: "标准复盘 - 剧情、观点、细节都保留", description: "适合常规阅读：结构完整，口吻克制，兼顾剧情归纳和评论区主要分歧。" },
   { id: "brief", name: "短摘要 - 快速扫读本集反应", description: "适合先看结论：压缩篇幅，只保留最明确的剧情信息、观众态度和讨论信号。" },
@@ -630,12 +632,16 @@ function HealthPanel({
   health,
   loading,
   error,
-  onRefresh
+  onRefresh,
+  onClearReports,
+  onClearCache
 }: {
   health: HealthStatus | null;
   loading: boolean;
   error: string;
   onRefresh: () => void;
+  onClearReports: () => void;
+  onClearCache: () => void;
 }) {
   return (
     <section className="health-view">
@@ -667,7 +673,18 @@ function HealthPanel({
             <History size={18} />
             <h2>本地报告</h2>
           </div>
-          <strong>{health ? health.reports.count : "..."}</strong>
+          <div className="health-card-stat">
+            <strong>{health ? health.reports.count : "..."}</strong>
+            <button
+              className="health-danger-action"
+              type="button"
+              onClick={onClearReports}
+              disabled={!health || health.reports.count === 0}
+            >
+              <Trash2 size={16} />
+              <span>清空报告</span>
+            </button>
+          </div>
           <p>保存在本机的报告索引数量。</p>
         </article>
         <article className="panel health-card">
@@ -675,7 +692,18 @@ function HealthPanel({
             <BarChart3 size={18} />
             <h2>缓存</h2>
           </div>
-          <strong>{health ? formatBytes(health.cache.totalBytes) : "..."}</strong>
+          <div className="health-card-stat">
+            <strong>{health ? formatBytes(health.cache.totalBytes) : "..."}</strong>
+            <button
+              className="health-danger-action"
+              type="button"
+              onClick={onClearCache}
+              disabled={!health || health.cache.fileCount === 0}
+            >
+              <Trash2 size={16} />
+              <span>清空缓存</span>
+            </button>
+          </div>
           <p>{health ? `${health.cache.fileCount} 个缓存文件` : "正在读取缓存目录"}</p>
         </article>
       </div>
@@ -1941,7 +1969,7 @@ export default function BangumiLensApp() {
   const [subjectTitleTranslations, setSubjectTitleTranslations] = useState<Record<string, EpisodeTitleTranslationState>>({});
   const [likeHistoryPrompt, setLikeHistoryPrompt] = useState<LikeHistoryPrompt | null>(null);
   const [deleteHistoryPrompt, setDeleteHistoryPrompt] = useState<SavedReport | null>(null);
-  const [clearHistoryPrompt, setClearHistoryPrompt] = useState(false);
+  const [clearLocalDataPrompt, setClearLocalDataPrompt] = useState<ClearLocalDataScope | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthError, setHealthError] = useState("");
@@ -2033,7 +2061,7 @@ export default function BangumiLensApp() {
       pendingAiSubjectTitleTranslation ||
       missingEpisodePrompt ||
       deleteHistoryPrompt ||
-      clearHistoryPrompt ||
+      clearLocalDataPrompt ||
       likeHistoryPrompt
   );
 
@@ -2623,41 +2651,47 @@ export default function BangumiLensApp() {
     deleteHistoryItem(itemId);
   }
 
-  function confirmClearHistory() {
+  function confirmClearLocalData() {
+    if (!clearLocalDataPrompt) return;
+    const scope = clearLocalDataPrompt;
     const previousHistory = history;
-    setClearHistoryPrompt(false);
+    setClearLocalDataPrompt(null);
     setNotice("");
     setError("");
-    setHistory([]);
-    setCollapsedSubjects(new Set());
-    setReport(null);
-    setStreamingText("");
-    setShowSeasonTrend(false);
-    setSeasonTrend(null);
-    setSeasonTrendError("");
-    setSeasonTrendAiSummary("");
-    setSeasonTrendAiSummaryError("");
-    loadedRouteReportIdRef.current = null;
-    pendingRouteReportIdRef.current = null;
-    router.push(HOME_ROUTE);
+
+    if (scope === "reports") {
+      setHistory([]);
+      setCollapsedSubjects(new Set());
+      setReport(null);
+      setStreamingText("");
+      setShowSeasonTrend(false);
+      setSeasonTrend(null);
+      setSeasonTrendError("");
+      setSeasonTrendAiSummary("");
+      setSeasonTrendAiSummaryError("");
+      loadedRouteReportIdRef.current = null;
+      pendingRouteReportIdRef.current = null;
+      router.push(HOME_ROUTE);
+    }
 
     void fetch("/api/history", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ all: true })
+      body: JSON.stringify({ scope })
     })
       .then(async (response) => {
         const payload = (await response.json()) as { history?: SavedReport[] };
         if (!response.ok) {
-          setHistory(previousHistory);
+          if (scope === "reports") setHistory(previousHistory);
           setError("清空失败，请稍后重试。");
           return;
         }
         if (payload.history) setHistory(payload.history);
-        setNotice("已清空全部报告和缓存。");
+        setNotice(scope === "reports" ? "已清空全部报告。" : "已清空全部缓存。");
+        void loadHealth();
       })
       .catch(() => {
-        setHistory(previousHistory);
+        if (scope === "reports") setHistory(previousHistory);
         setError("清空失败，请稍后重试。");
       });
   }
@@ -4045,17 +4079,6 @@ export default function BangumiLensApp() {
             <History size={18} />
             最近
           </span>
-          {history.length > 0 ? (
-            <button
-              className="history-clear"
-              type="button"
-              onClick={() => setClearHistoryPrompt(true)}
-              title="清空全部报告和缓存"
-              aria-label="清空全部报告和缓存"
-            >
-              <Trash2 size={16} />
-            </button>
-          ) : null}
         </div>
         {groupedHistory.length > 0 ? (
           <div className="history-groups">
@@ -4169,7 +4192,14 @@ export default function BangumiLensApp() {
         </button>
       </div>
       {isHealthPath(pathname) ? (
-        <HealthPanel health={health} loading={healthLoading} error={healthError} onRefresh={loadHealth} />
+        <HealthPanel
+          health={health}
+          loading={healthLoading}
+          error={healthError}
+          onRefresh={loadHealth}
+          onClearReports={() => setClearLocalDataPrompt("reports")}
+          onClearCache={() => setClearLocalDataPrompt("cache")}
+        />
       ) : (
       <>
       <section className={report ? "hero hero-report" : "hero"}>
@@ -5200,21 +5230,30 @@ export default function BangumiLensApp() {
           ]}
         />
       ) : null}
-      {clearHistoryPrompt ? (
+      {clearLocalDataPrompt ? (
         <ConfirmDialog
-          titleId="clear-history-title"
+          titleId="clear-local-data-title"
           icon={<Trash2 size={20} />}
-          label="清空本地内容"
-          title="确认清空全部报告和缓存？"
+          label={clearLocalDataPrompt === "reports" ? "清空本地报告" : "清空本地缓存"}
+          title={clearLocalDataPrompt === "reports" ? "确认清空全部本地报告？" : "确认清空全部缓存？"}
           description={
-            <>
-              将删除本机保存的全部 {history.length} 份报告、历史索引和全部缓存内容。这个操作不会删除 Bangumi 上的内容，但本地报告和缓存无法从这里恢复。
-            </>
+            clearLocalDataPrompt === "reports" ? (
+              <>
+                将删除本机保存的全部 {history.length} 份报告和历史索引。这个操作不会删除 Bangumi
+                上的内容，但本地报告无法从这里恢复。
+              </>
+            ) : (
+              <>将删除本机保存的全部缓存内容。报告历史会保留，之后搜索、条目信息和标题翻译可能需要重新读取。</>
+            )
           }
-          onClose={() => setClearHistoryPrompt(false)}
+          onClose={() => setClearLocalDataPrompt(null)}
           actions={[
-            { label: "取消", onClick: () => setClearHistoryPrompt(false), className: "secondary-action" },
-            { label: "清空全部内容", onClick: confirmClearHistory, className: "primary-action" }
+            { label: "取消", onClick: () => setClearLocalDataPrompt(null), className: "secondary-action" },
+            {
+              label: clearLocalDataPrompt === "reports" ? "清空报告" : "清空缓存",
+              onClick: confirmClearLocalData,
+              className: "primary-action"
+            }
           ]}
         />
       ) : null}
