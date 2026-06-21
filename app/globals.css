@@ -1015,27 +1015,20 @@ input {
 }
 
 .episode-choice-row {
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "title meta";
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
-  min-height: 50px;
-}
-
-.episode-choice-row label {
-  grid-area: title;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 9px;
-  align-items: start;
-  min-width: 0;
-  cursor: pointer;
-  padding-top: 2px;
+  height: auto;
+  min-height: 62px;
+  overflow: visible;
+  padding-block: 10px;
 }
 
 .episode-choice-row input {
   width: 16px;
   height: 16px;
+  margin: 2px 0 0;
   accent-color: var(--accent);
 }
 
@@ -1045,11 +1038,10 @@ input {
 }
 
 .episode-choice-meta {
-  grid-area: meta;
   display: grid;
   gap: 6px;
   justify-items: end;
-  justify-self: end;
+  min-height: 44px;
   min-width: 74px;
   padding-top: 1px;
 }
@@ -1071,7 +1063,7 @@ input {
   color: var(--accent-dark);
 }
 
-.episode-choice-row label span,
+.episode-choice-title,
 .episode-choice-list > button span {
   min-width: 0;
   font-size: 14px;
@@ -1081,8 +1073,9 @@ input {
   word-break: break-word;
 }
 
-.episode-choice-row label span {
+.episode-choice-title {
   display: block;
+  max-height: none;
   overflow: visible;
 }
 
@@ -2794,13 +2787,22 @@ input {
   }
 
   .episode-choice-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 16px minmax(0, 1fr);
     grid-template-areas:
-      "title title"
+      "check title"
       "meta meta";
   }
 
+  .episode-choice-row input {
+    grid-area: check;
+  }
+
+  .episode-choice-title {
+    grid-area: title;
+  }
+
   .episode-choice-meta {
+    grid-area: meta;
     display: flex;
     align-items: center;
     justify-content: space-between;

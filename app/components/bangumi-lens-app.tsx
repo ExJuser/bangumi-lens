@@ -3712,6 +3712,7 @@ export default function BangumiLensApp() {
                             {filteredSearchEpisodes.map((episode) => {
                               const selected = selectedSearchEpisodeIds.has(episode.id);
                               const saved = savedSearchEpisodeIds.has(episode.id);
+                              const episodeInputId = `episode-choice-${episode.id}`;
 
                               return (
                                 <div
@@ -3720,14 +3721,16 @@ export default function BangumiLensApp() {
                                     .join(" ")}
                                   key={episode.id}
                                 >
-                                  <label>
-                                    <input
-                                      type="checkbox"
-                                      checked={selected}
-                                      disabled={saved}
-                                      onChange={() => toggleSearchEpisodeSelection(episode.id)}
-                                    />
-                                    <span>{getEpisodeChoiceLabel(episode)}</span>
+                                  <input
+                                    id={episodeInputId}
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={saved}
+                                    aria-label={getEpisodeChoiceLabel(episode)}
+                                    onChange={() => toggleSearchEpisodeSelection(episode.id)}
+                                  />
+                                  <label className="episode-choice-title" htmlFor={episodeInputId}>
+                                    {getEpisodeChoiceLabel(episode)}
                                   </label>
                                   <span className="episode-choice-meta">
                                     <strong>{saved ? "已有报告" : "未生成"}</strong>
