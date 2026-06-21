@@ -10,6 +10,7 @@ config/.env.local
 logs/
 *.tsbuildinfo
 .superpowers
+.impeccable/
 .agents/
 .codex/
 data/reports.json
