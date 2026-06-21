@@ -1567,6 +1567,7 @@ export default function BangumiLensApp() {
   const [searchEpisodes, setSearchEpisodes] = useState<SearchEpisodeChoice[]>([]);
   const [searchEpisodeQuery, setSearchEpisodeQuery] = useState("");
   const [selectedSearchEpisodeIds, setSelectedSearchEpisodeIds] = useState<Set<string>>(() => new Set());
+  const [searchSelectionError, setSearchSelectionError] = useState("");
   const [pendingSearchEpisodeGeneration, setPendingSearchEpisodeGeneration] =
     useState<PendingSearchEpisodeGeneration | null>(null);
   const [loadingSearchEpisodes, setLoadingSearchEpisodes] = useState(false);
@@ -1948,6 +1949,11 @@ export default function BangumiLensApp() {
     setLoading(false);
     setStreamingText("");
     setSearchResults([]);
+    setSelectedSearchResult(null);
+    setSearchEpisodes([]);
+    setSearchEpisodeQuery("");
+    setSelectedSearchEpisodeIds(new Set());
+    setSearchSelectionError("");
     setShowSeasonTrend(false);
     setSeasonTrend(null);
     setSeasonTrendError("");
@@ -2689,6 +2695,7 @@ export default function BangumiLensApp() {
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
     setSelectedSearchEpisodeIds(new Set());
+    setSearchSelectionError("");
     setSearching(true);
 
     try {
@@ -2786,7 +2793,7 @@ export default function BangumiLensApp() {
   }
 
   async function selectSearchResult(result: SearchResult) {
-    setError("");
+    setSearchSelectionError("");
     setSelectedSearchResult(result);
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
@@ -2825,7 +2832,7 @@ export default function BangumiLensApp() {
 
       setSearchEpisodes(episodes);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "章节列表加载失败，请稍后重试。");
+      setSearchSelectionError(caught instanceof Error ? caught.message : "章节列表加载失败，请稍后重试。");
     } finally {
       setLoadingSearchEpisodes(false);
     }
@@ -2837,6 +2844,7 @@ export default function BangumiLensApp() {
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
     setSelectedSearchEpisodeIds(new Set());
+    setSearchSelectionError("");
     setUrl(episode.url);
     startAnalysis(episode.url);
   }
@@ -2874,7 +2882,7 @@ export default function BangumiLensApp() {
 
     const episodesToGenerate = selectedSearchEpisodes.filter((episode) => !savedSearchEpisodeIds.has(episode.id));
     if (episodesToGenerate.length === 0) {
-      setError("选中的章节都已经有本地报告。请直接从历史记录打开，或单独选择章节后重新生成。");
+      setSearchSelectionError("选中的章节都已经有本地报告。请直接从历史记录打开，或单独选择章节后重新生成。");
       return;
     }
 
@@ -2900,6 +2908,7 @@ export default function BangumiLensApp() {
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
     setSelectedSearchEpisodeIds(new Set());
+    setSearchSelectionError("");
     seasonReportGenerationCancelledRef.current = false;
     seasonReportGenerationAbortRef.current?.abort();
     setReport(null);
@@ -3034,6 +3043,7 @@ export default function BangumiLensApp() {
     setSearchEpisodes([]);
     setSearchEpisodeQuery("");
     setSelectedSearchEpisodeIds(new Set());
+    setSearchSelectionError("");
     setLoadingSearchEpisodes(false);
   }
 
@@ -3654,6 +3664,11 @@ export default function BangumiLensApp() {
                       <p className="episode-choice-loading">
                         <Loader2 className="spin" size={16} />
                         正在加载章节列表
+                      </p>
+                    ) : searchSelectionError ? (
+                      <p className="episode-choice-error">
+                        <AlertCircle size={17} />
+                        {searchSelectionError}
                       </p>
                     ) : (
                       <>
