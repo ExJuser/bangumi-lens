@@ -64,6 +64,11 @@ test("search API backfills pages with usable Bangumi subjects and caches pages s
   const source = readFileSync(join(process.cwd(), "app", "api", "search", "route.ts"), "utf8");
 
   assert.match(source, /const SEARCH_PAGE_SIZE = 6/);
+  assert.match(source, /const SEARCH_CACHE_NAMESPACE = "bangumi-search-v5"/);
+  assert.match(source, /coverPreviewUrl\?: string/);
+  assert.match(source, /function getSubjectCoverPreviewUrl\(subject: BangumiSubject\)/);
+  assert.match(source, /subject\.images\?\.large \|\|[\s\S]*?subject\.images\?\.grid/);
+  assert.match(source, /coverPreviewUrl: getSubjectCoverPreviewUrl\(subject\)/);
   assert.match(source, /const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5/);
   assert.match(source, /search\/subjects\?limit=\$\{SEARCH_PAGE_SIZE\}&offset=\$\{offset\}/);
   assert.match(source, /let offset = 0/);

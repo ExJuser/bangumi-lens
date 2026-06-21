@@ -45,6 +45,7 @@ export type SearchResult = {
   title: string;
   titleCn?: string;
   coverUrl?: string;
+  coverPreviewUrl?: string;
   episodeTotal?: number;
   subjectInfo?: SubjectInfoPayload;
   firstEpisodeId: string;
@@ -64,7 +65,7 @@ type SearchPayload = {
 const SEARCH_PAGE_SIZE = 6;
 const SEARCH_PAGE_EXTRA_SCAN_PAGES = 5;
 const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const SEARCH_CACHE_NAMESPACE = "bangumi-search-v4";
+const SEARCH_CACHE_NAMESPACE = "bangumi-search-v5";
 const cache = new Map<string, { expiresAt: number; payload: SearchPayload }>();
 
 function normalizeQuery(query: string) {
@@ -85,6 +86,17 @@ function getSubjectCoverUrl(subject: BangumiSubject) {
     subject.images?.common ||
     subject.images?.medium ||
     subject.images?.large ||
+    subject.images?.small ||
+    undefined
+  );
+}
+
+function getSubjectCoverPreviewUrl(subject: BangumiSubject) {
+  return (
+    subject.images?.large ||
+    subject.images?.common ||
+    subject.images?.medium ||
+    subject.images?.grid ||
     subject.images?.small ||
     undefined
   );
@@ -165,6 +177,7 @@ async function buildSearchResults(subjects: BangumiSubject[]) {
         title: subject.name?.trim() || getSubjectTitle(subject),
         titleCn: subject.name_cn?.trim() || undefined,
         coverUrl: getSubjectCoverUrl(subject),
+        coverPreviewUrl: getSubjectCoverPreviewUrl(subject),
         episodeTotal: Number.isFinite(episodeTotal) && episodeTotal > 0 ? episodeTotal : undefined,
         firstEpisodeId: String(episode.id),
         firstEpisodeTitle: getEpisodeTitle(episode),
