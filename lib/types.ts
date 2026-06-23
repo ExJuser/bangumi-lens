@@ -87,7 +87,6 @@ export type ReportItem = {
 export type ReportQuote = {
   text: string;
   sourceCommentId?: string;
-  reactions?: BangumiReaction[];
   source?: ReportSourceEvidence;
 };
 
@@ -96,9 +95,6 @@ export type ReportSourceEvidence = {
   floor?: string;
   author?: string;
   text: string;
-  replyCount: number;
-  reactionCount: number;
-  reactions: BangumiReaction[];
   commentUrl?: string;
 };
 

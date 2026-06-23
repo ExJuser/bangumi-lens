@@ -109,9 +109,6 @@ function createSourceEvidence(comment: WeightedComment, episodeUrl: string): Rep
     floor: comment.floor,
     author: comment.author,
     text: comment.text.slice(0, 420),
-    replyCount: comment.replyCount,
-    reactionCount: comment.reactionCount,
-    reactions: comment.reactions,
     commentUrl: buildCommentUrl(episodeUrl, comment.id)
   };
 }
@@ -128,7 +125,6 @@ function enrichReportItemsWithEvidence(items: ReportItem[], comments: WeightedCo
 
       return {
         ...quote,
-        reactions: sourceComment.reactions,
         source: createSourceEvidence(sourceComment, meta.url)
       };
     }),

@@ -58,10 +58,6 @@ type ReportItem = {
 type ReportQuote = {
   text: string;
   sourceCommentId?: string;
-  reactions?: {
-    label: string;
-    count: number;
-  }[];
   source?: ReportSourceEvidence;
 };
 
@@ -70,12 +66,6 @@ type ReportSourceEvidence = {
   floor?: string;
   author?: string;
   text: string;
-  replyCount: number;
-  reactionCount: number;
-  reactions: {
-    label: string;
-    count: number;
-  }[];
   commentUrl?: string;
 };
 
@@ -586,7 +576,7 @@ const EMPTY_PREVIEW_ITEMS = [
   },
   {
     title: "讨论热点",
-    description: "聚合被回复和表情放大的讨论信号。",
+    description: "聚合评论上下文中反复出现的讨论线索。",
     icon: <ThumbsUp size={18} />
   },
   {
@@ -873,9 +863,7 @@ function getCommentLink(episodeUrl: string, commentId?: string) {
 function formatEvidenceMeta(evidence: ReportSourceEvidence) {
   return [
     evidence.floor ? `#${evidence.floor}` : undefined,
-    evidence.author,
-    `${evidence.replyCount} 回复`,
-    `${evidence.reactionCount} 表情`
+    evidence.author
   ]
     .filter(Boolean)
     .join(" / ");
@@ -905,16 +893,6 @@ function SourceEvidenceList({ evidence }: { evidence?: ReportSourceEvidence[] })
             <p>
               <RichText text={item.text} />
             </p>
-            {item.reactions.length > 0 ? (
-              <span className="reaction-pills" aria-label="表情统计">
-                {item.reactions.slice(0, 6).map((reaction, reactionIndex) => (
-                  <span className="reaction-pill" key={`${reaction.label}-${reactionIndex}`}>
-                    {reaction.label}
-                    <strong>{reaction.count}</strong>
-                  </span>
-                ))}
-              </span>
-            ) : null}
           </article>
         ))}
       </div>
@@ -950,16 +928,6 @@ function ReportList({ items, icon, episodeUrl }: { items: ReportItem[]; icon: Re
                         <Quote size={14} />
                         <span>
                           <RichText text={quote.text} />
-                          {quote.reactions && quote.reactions.length > 0 ? (
-                            <span className="reaction-pills" aria-label="表情回复">
-                              {quote.reactions.map((reaction, reactionIndex) => (
-                                <span className="reaction-pill" key={`${reaction.label}-${reactionIndex}`}>
-                                  {reaction.label}
-                                  <strong>{reaction.count}</strong>
-                                </span>
-                              ))}
-                            </span>
-                          ) : null}
                         </span>
                         {quoteLink ? (
                           <a href={quoteLink} rel="noreferrer" target="_blank">
@@ -4241,7 +4209,7 @@ export default function BangumiLensApp() {
               </div>
               <h1>把单集评论区整理成一份可复盘的阅读报告</h1>
               <p>
-                输入 Bangumi 章节链接，聚合公开评论、楼中楼回复和表情信号，生成剧情简述、主流观点、讨论热点与共鸣吐槽。
+                输入 Bangumi 章节链接，聚合公开评论和楼中楼内容，生成剧情简述、主流观点、讨论热点与共鸣吐槽。
               </p>
             </>
           )}

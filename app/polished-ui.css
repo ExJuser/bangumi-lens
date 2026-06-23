@@ -3039,37 +3039,6 @@ html[data-ui="polished"], html[data-ui="polished"] body {
   margin-top: 1px;
 }
 
-:root[data-ui="polished"] .reaction-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 7px;
-}
-
-:root[data-ui="polished"] .reaction-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 140px;
-  min-height: 24px;
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 8%, var(--field));
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1;
-  overflow: hidden;
-  padding: 3px 8px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:root[data-ui="polished"] .reaction-pill strong {
-  flex: 0 0 auto;
-  color: var(--accent-dark);
-  font-size: 13px;
-}
-
 :root[data-ui="polished"] .source-evidence {
   margin-top: 12px;
 }

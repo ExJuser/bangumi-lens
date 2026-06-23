@@ -134,12 +134,7 @@ function summarizeMetric(episodes: SeasonTrendEpisode[], readValue: (episode: Se
 }
 
 function itemHeat(item: ReportItem, episode: SeasonTrendEpisode) {
-  const quoteReactionCount =
-    item.quotes?.reduce(
-      (sum, quote) => sum + (quote.reactions?.reduce((reactionSum, reaction) => reactionSum + reaction.count, 0) || 0),
-      0
-    ) || 0;
-  return episode.discussionHeat + item.sourceCommentIds.length * 12 + quoteReactionCount;
+  return episode.discussionHeat + item.sourceCommentIds.length * 12;
 }
 
 function collectPoints(

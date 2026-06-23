@@ -39,7 +39,7 @@ function requireTypeScriptModule(path) {
   return module.exports;
 }
 
-test("parseReportOutput keeps defaults and enriches quote reactions", () => {
+test("parseReportOutput keeps defaults and enriches source evidence without engagement stats", () => {
   const { parseReportOutput } = requireTypeScriptModule(join(process.cwd(), "lib", "report.ts"));
   const meta = {
     url: "https://bgm.tv/ep/1",
@@ -89,15 +89,12 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
   assert.equal(report.episodeDetails.length, 0);
   assert.equal(report.productionNotes.length, 0);
   assert.equal(Number.isFinite(new Date(report.generatedAt).getTime()), true);
-  assert.deepEqual(report.discussionHotspots[0].quotes?.[0].reactions, [{ label: "like", count: 2 }]);
+  assert.equal("reactions" in report.discussionHotspots[0].quotes?.[0], false);
   assert.deepEqual(report.discussionHotspots[0].quotes?.[0].source, {
     id: "post-1",
     floor: "12",
     author: "alice",
     text: "comment text",
-    replyCount: 3,
-    reactionCount: 2,
-    reactions: [{ label: "like", count: 2 }],
     commentUrl: "https://bgm.tv/ep/1#post_post-1"
   });
   assert.deepEqual(report.discussionHotspots[0].sourceEvidence, [
@@ -106,12 +103,15 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
       floor: "12",
       author: "alice",
       text: "comment text",
-      replyCount: 3,
-      reactionCount: 2,
-      reactions: [{ label: "like", count: 2 }],
       commentUrl: "https://bgm.tv/ep/1#post_post-1"
     }
   ]);
+  assert.equal("replyCount" in report.discussionHotspots[0].quotes?.[0].source, false);
+  assert.equal("reactionCount" in report.discussionHotspots[0].quotes?.[0].source, false);
+  assert.equal("reactions" in report.discussionHotspots[0].quotes?.[0].source, false);
+  assert.equal("replyCount" in report.discussionHotspots[0].sourceEvidence?.[0], false);
+  assert.equal("reactionCount" in report.discussionHotspots[0].sourceEvidence?.[0], false);
+  assert.equal("reactions" in report.discussionHotspots[0].sourceEvidence?.[0], false);
   assert.deepEqual(report.resonancePoints[0].quotes?.[0], { text: "legacy string quote" });
   assert.deepEqual(report.stanceDistribution, []);
   assert.deepEqual(report.stats, {
@@ -168,9 +168,6 @@ test("parseReportOutput validates stance distribution and enriches evidence", ()
       floor: "8",
       author: "bob",
       text: "演出很好",
-      replyCount: 1,
-      reactionCount: 3,
-      reactions: [{ label: "+1", count: 3 }],
       commentUrl: "https://bgm.tv/ep/3#post_post-stance"
     }
   ]);

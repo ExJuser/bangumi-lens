@@ -51,9 +51,6 @@ export function buildCommentDigest(comments: WeightedComment[]) {
     floor: comment.floor,
     author: comment.author,
     text: comment.text.slice(0, 420),
-    replyCount: comment.replyCount,
-    reactionCount: comment.reactionCount,
-    reactions: comment.reactions,
     sampleReplies: comment.replies.slice(0, 6).map((reply) => reply.text.slice(0, 180)),
     signals: comment.signals,
     weight: Number(comment.weight.toFixed(2))
