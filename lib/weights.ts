@@ -15,7 +15,7 @@ export function weightComments(comments: BangumiComment[]): WeightedComment[] {
   return comments
     .map((comment) => {
       const discussion = Math.log1p(comment.replyCount) * 2.2;
-      const resonance = Math.log1p(comment.reactionCount + comment.likeCount) * 1.8;
+      const resonance = Math.log1p(comment.reactionCount) * 1.8;
       const information = informationScore(comment.text) * 1.6;
       const weight = discussion + resonance + information;
 
@@ -39,7 +39,7 @@ export function buildCommentDigest(comments: WeightedComment[]) {
     .sort((a, b) => b.signals.discussion - a.signals.discussion)
     .slice(0, 18);
   const resonanceHeavy = [...comments]
-    .filter((comment) => comment.reactionCount + comment.likeCount > 0)
+    .filter((comment) => comment.reactionCount > 0)
     .sort((a, b) => b.signals.resonance - a.signals.resonance)
     .slice(0, 18);
 
@@ -53,7 +53,6 @@ export function buildCommentDigest(comments: WeightedComment[]) {
     text: comment.text.slice(0, 420),
     replyCount: comment.replyCount,
     reactionCount: comment.reactionCount,
-    likeCount: comment.likeCount,
     reactions: comment.reactions,
     sampleReplies: comment.replies.slice(0, 6).map((reply) => reply.text.slice(0, 180)),
     signals: comment.signals,

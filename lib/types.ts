@@ -45,7 +45,6 @@ export type BangumiComment = {
   createdAt?: string;
   replyCount: number;
   reactionCount: number;
-  likeCount: number;
   reactions: BangumiReaction[];
   replies: BangumiReply[];
 };
@@ -99,7 +98,6 @@ export type ReportSourceEvidence = {
   text: string;
   replyCount: number;
   reactionCount: number;
-  likeCount: number;
   reactions: BangumiReaction[];
   commentUrl?: string;
 };

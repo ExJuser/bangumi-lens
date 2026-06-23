@@ -72,7 +72,6 @@ type ReportSourceEvidence = {
   text: string;
   replyCount: number;
   reactionCount: number;
-  likeCount: number;
   reactions: {
     label: string;
     count: number;
@@ -587,7 +586,7 @@ const EMPTY_PREVIEW_ITEMS = [
   },
   {
     title: "讨论热点",
-    description: "聚合被回复、表情和点赞放大的讨论信号。",
+    description: "聚合被回复和表情放大的讨论信号。",
     icon: <ThumbsUp size={18} />
   },
   {
@@ -876,8 +875,7 @@ function formatEvidenceMeta(evidence: ReportSourceEvidence) {
     evidence.floor ? `#${evidence.floor}` : undefined,
     evidence.author,
     `${evidence.replyCount} 回复`,
-    `${evidence.reactionCount} 表情`,
-    `${evidence.likeCount} 赞`
+    `${evidence.reactionCount} 表情`
   ]
     .filter(Boolean)
     .join(" / ");
@@ -4243,7 +4241,7 @@ export default function BangumiLensApp() {
               </div>
               <h1>把单集评论区整理成一份可复盘的阅读报告</h1>
               <p>
-                输入 Bangumi 章节链接，聚合公开评论、楼中楼回复、表情和点赞信号，生成剧情简述、主流观点、讨论热点与共鸣吐槽。
+                输入 Bangumi 章节链接，聚合公开评论、楼中楼回复和表情信号，生成剧情简述、主流观点、讨论热点与共鸣吐槽。
               </p>
             </>
           )}

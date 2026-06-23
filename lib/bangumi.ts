@@ -372,7 +372,7 @@ function extractReactions(
 ): BangumiReaction[] {
   const reactions = new Map<string, number>();
   const reactionNodes = $node
-    .find(".reactions img, .emoji img, .reactions .item, .emoji .item")
+    .find(".reactions img, .emoji img, .reactions .item, .emoji .item, .reaction img, .reaction .item")
     .toArray()
     .filter(isElement);
 
@@ -390,6 +390,13 @@ function extractReactions(
     .slice(0, 6);
 
   return parsedReactions;
+}
+
+function extractReactionCount($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>, reactions: BangumiReaction[]) {
+  const parsedCount = reactions.reduce((sum, reaction) => sum + reaction.count, 0);
+  if (parsedCount > 0) return parsedCount;
+
+  return extractCount($node, [".reactions", ".emoji", ".reaction"]) || 0;
 }
 
 function extractId($node: cheerio.Cheerio<Element>, fallback: string) {
@@ -441,6 +448,30 @@ function isElement(node: unknown): node is Element {
   return Boolean(node && typeof node === "object" && "type" in node && (node as { type?: string }).type === "tag");
 }
 
+function extractReplyNodes($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>) {
+  const replyNodes: Element[] = [];
+  const seen = new Set<Element>();
+  const replyContainers = $node.find(".topic_sub_reply, .sub_reply, .cmt_sub").toArray().filter(isElement);
+
+  replyContainers.forEach((container) => {
+    const $container = $(container);
+    const nestedReplies = $container
+      .find("> .row_reply, > li[id^='post_'], > .item, > .reply_item, .sub_reply_bg > .row_reply")
+      .toArray()
+      .filter(isElement);
+    const nodes = nestedReplies.length > 0 ? nestedReplies : [container];
+
+    nodes.forEach((replyNode) => {
+      if (!seen.has(replyNode)) {
+        seen.add(replyNode);
+        replyNodes.push(replyNode);
+      }
+    });
+  });
+
+  return replyNodes;
+}
+
 function extractReply($: cheerio.CheerioAPI, node: Element, parentId: string, index: number): BangumiReply {
   const $node = $(node);
   const text =
@@ -452,21 +483,19 @@ function extractReply($: cheerio.CheerioAPI, node: Element, parentId: string, in
     author: extractAuthor($, $node),
     authorId: extractAuthorId($node),
     text,
-    reactionCount: extractCount($node, [".likes", ".reactions", ".emoji", ".tip_j"])
+    reactionCount: extractReactionCount($, $node, extractReactions($, $node))
   };
 }
 
 function extractComment($: cheerio.CheerioAPI, node: Element, index: number): BangumiComment | null {
   const $node = $(node);
   const id = extractId($node, `comment-${index + 1}`);
-  const replies = $node
-    .find(".reply, .sub_reply, .topic_sub_reply, .cmt_sub, .inner .row_reply")
-    .toArray()
+  const replies = extractReplyNodes($, $node)
     .map((replyNode, replyIndex) => extractReply($, replyNode, id, replyIndex))
     .filter((reply) => reply.text.length > 0);
 
   const cloned = $node.clone();
-  cloned.find(".reply, .sub_reply, .topic_sub_reply, .cmt_sub, .inner .row_reply, script, style").remove();
+  cloned.find(".topic_sub_reply, .sub_reply, .cmt_sub, script, style").remove();
 
   const text =
     normalizeText(cloned.find(".message, .content, .text, .cmt_content, .reply_content").first().text()) ||
@@ -479,11 +508,8 @@ function extractComment($: cheerio.CheerioAPI, node: Element, index: number): Ba
     replies.length ||
     extractCount($node, [".reply_count", ".sub_reply_count", ".replies"]) ||
     countFromText(nodeText, [/(\d+)\s*条回复/, /回复\s*\(?(\d+)\)?/]);
-  const reactionCount =
-    extractCount($node, [".reactions", ".emoji", ".likes", ".tip_j"]) ||
-    countFromText(nodeText, [/(\d+)\s*个?表情/, /表情\s*\(?(\d+)\)?/]);
-  const likeCount = countFromText(nodeText, [/(\d+)\s*个?赞/, /赞\s*\(?(\d+)\)?/]);
-  const reactions = extractReactions($, $node);
+  const reactions = extractReactions($, cloned);
+  const reactionCount = extractReactionCount($, cloned, reactions);
 
   return {
     id,
@@ -494,7 +520,6 @@ function extractComment($: cheerio.CheerioAPI, node: Element, index: number): Ba
     createdAt: normalizeText($node.find("time, .time, .date").first().text()) || undefined,
     replyCount,
     reactionCount,
-    likeCount,
     reactions,
     replies
   };

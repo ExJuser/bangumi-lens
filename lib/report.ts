@@ -111,7 +111,6 @@ function createSourceEvidence(comment: WeightedComment, episodeUrl: string): Rep
     text: comment.text.slice(0, 420),
     replyCount: comment.replyCount,
     reactionCount: comment.reactionCount,
-    likeCount: comment.likeCount,
     reactions: comment.reactions,
     commentUrl: buildCommentUrl(episodeUrl, comment.id)
   };

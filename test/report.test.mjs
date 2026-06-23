@@ -97,7 +97,6 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
     text: "comment text",
     replyCount: 3,
     reactionCount: 2,
-    likeCount: 5,
     reactions: [{ label: "like", count: 2 }],
     commentUrl: "https://bgm.tv/ep/1#post_post-1"
   });
@@ -109,7 +108,6 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
       text: "comment text",
       replyCount: 3,
       reactionCount: 2,
-      likeCount: 5,
       reactions: [{ label: "like", count: 2 }],
       commentUrl: "https://bgm.tv/ep/1#post_post-1"
     }
@@ -119,7 +117,7 @@ test("parseReportOutput keeps defaults and enriches quote reactions", () => {
   assert.deepEqual(report.stats, {
     commentCount: 1,
     replyCount: 3,
-    reactionCount: 7,
+    reactionCount: 2,
     participantCount: 1
   });
 });
@@ -155,7 +153,7 @@ test("parseReportOutput validates stance distribution and enriches evidence", ()
         replyCount: 1,
         reactionCount: 3,
         likeCount: 2,
-        reactions: [{ label: "赞", count: 3 }],
+        reactions: [{ label: "+1", count: 3 }],
         replies: [],
         weight: 1,
         signals: { discussion: 1, resonance: 1, information: 0 }
@@ -172,8 +170,7 @@ test("parseReportOutput validates stance distribution and enriches evidence", ()
       text: "演出很好",
       replyCount: 1,
       reactionCount: 3,
-      likeCount: 2,
-      reactions: [{ label: "赞", count: 3 }],
+      reactions: [{ label: "+1", count: 3 }],
       commentUrl: "https://bgm.tv/ep/3#post_post-stance"
     }
   ]);

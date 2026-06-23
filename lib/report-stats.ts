@@ -11,7 +11,7 @@ function addParticipant(participants: Set<string>, author?: string, authorId?: s
 }
 
 export function buildReportStats(
-  comments: Pick<WeightedComment, "author" | "authorId" | "replyCount" | "reactionCount" | "likeCount" | "replies">[]
+  comments: Pick<WeightedComment, "author" | "authorId" | "replyCount" | "reactionCount" | "replies">[]
 ) {
   const participants = new Set<string>();
 
@@ -23,7 +23,7 @@ export function buildReportStats(
   return {
     commentCount: comments.length,
     replyCount: comments.reduce((sum, comment) => sum + comment.replyCount, 0),
-    reactionCount: comments.reduce((sum, comment) => sum + comment.reactionCount + comment.likeCount, 0),
+    reactionCount: comments.reduce((sum, comment) => sum + comment.reactionCount, 0),
     participantCount: participants.size
   };
 }

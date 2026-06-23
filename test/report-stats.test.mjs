@@ -56,9 +56,24 @@ test("buildReportStats counts unique main comment and reply authors as participa
   assert.deepEqual(stats, {
     commentCount: 2,
     replyCount: 3,
-    reactionCount: 6,
+    reactionCount: 3,
     participantCount: 4
   });
+});
+
+test("buildReportStats ignores legacy likeCount values", () => {
+  const { buildReportStats } = requireTypeScriptModule(join(process.cwd(), "lib", "report-stats.ts"));
+  const stats = buildReportStats([
+    {
+      author: "alice",
+      replyCount: 0,
+      reactionCount: 2,
+      likeCount: 99,
+      replies: []
+    }
+  ]);
+
+  assert.equal(stats.reactionCount, 2);
 });
 
 test("buildReportStats prefers author ids for participant de-duplication", () => {

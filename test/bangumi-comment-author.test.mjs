@@ -66,3 +66,41 @@ test("parseEpisode extracts authors after empty avatar links", () => {
   assert.equal(episode.comments[0].replies[0].authorId, "bob");
   assert.equal(buildReportStats(episode.comments).participantCount, 2);
 });
+
+test("parseEpisode expands nested reply rows and does not count floor ids as reactions", () => {
+  const { bangumiInternals } = requireTypeScriptModule(join(process.cwd(), "lib", "bangumi.ts"));
+  const html = `
+    <html>
+      <head><title>ep. 10 Test Episode / Test Subject</title></head>
+      <body>
+        <h1 class="nameSingle"><a href="/subject/1">Test Subject</a></h1>
+        <div id="comment_list">
+          <div id="post_3263" class="row_reply">
+            <span class="floor">3263</span>
+            <a href="/user/alice">alice</a>
+            <span class="message">main comment</span>
+            <div class="topic_sub_reply">
+              <div id="post_3264" class="row_reply">
+                <a href="/user/bob">bob</a>
+                <span class="message">first reply</span>
+              </div>
+              <div id="post_3265" class="row_reply">
+                <a href="/user/carol">carol</a>
+                <span class="message">second reply</span>
+                <span class="reactions"><span class="item" title="+1">+1 1</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const episode = bangumiInternals.parseEpisode(html, "https://bgm.tv/ep/1", "1");
+  assert.equal(episode.comments.length, 1);
+  assert.equal(episode.comments[0].replyCount, 2);
+  assert.equal(episode.comments[0].replies.length, 2);
+  assert.equal(episode.comments[0].reactionCount, 0);
+  assert.deepEqual(episode.comments[0].reactions, []);
+  assert.equal(episode.comments[0].replies[1].reactionCount, 1);
+});
