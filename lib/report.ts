@@ -43,6 +43,13 @@ const reportSchema = z.object({
   spoilerNotes: z.array(z.string()).default([])
 });
 
+const POSITIVE_STANCE_PATTERN =
+  /(期待|不错|真不错|好看|有趣|可爱|喜欢|舒服|亮|眼前一亮|有用|笑死|乐|香|神|稳|可以|还行|能看|继续|后续|op\s*真不错|ed\s*真不错)/i;
+const NEGATIVE_STANCE_PATTERN =
+  /(失望|无聊|难看|糟|差|烂|尬|弃|看不下去|不行|崩|拉胯|灾难|不喜欢|没意思|受不了)/i;
+const CONTROVERSY_STANCE_PATTERN =
+  /(争议|吵|撕|两极|分化|分歧|褒贬|反对|支持|有人.+有人|一边.+一边|党争|站队|大战|互喷|骂战)/i;
+
 function responseJsonSchema() {
   return JSON.stringify({
     episodeSummary: "string",
@@ -143,7 +150,7 @@ function enrichStanceDistributionWithEvidence(
 ) {
   const commentsById = new Map(comments.map((comment) => [comment.id, comment]));
 
-  return items.map((item) => ({
+  return rebalanceStanceDistributionEvidence(items, commentsById).map((item) => ({
     ...item,
     sourceEvidence: [...new Set(item.sourceCommentIds || [])]
       .map((commentId) => commentsById.get(commentId))
@@ -151,6 +158,56 @@ function enrichStanceDistributionWithEvidence(
       .slice(0, 4)
       .map((comment) => createSourceEvidence(comment, meta.url))
   }));
+}
+
+function inferCommentStanceLabel(comment: WeightedComment): StanceDistributionItem["label"] | undefined {
+  const text = [comment.text, ...comment.replies.map((reply) => reply.text)].join(" ");
+  const hasPositive = POSITIVE_STANCE_PATTERN.test(text);
+  const hasNegative = NEGATIVE_STANCE_PATTERN.test(text);
+  const hasControversy = CONTROVERSY_STANCE_PATTERN.test(text);
+
+  if (hasControversy || (hasPositive && hasNegative)) return "争议";
+  if (hasPositive) return "好评";
+  if (hasNegative) return "失望";
+  return undefined;
+}
+
+function rebalanceStanceDistributionEvidence(
+  items: StanceDistributionItem[],
+  commentsById: Map<string, WeightedComment>
+) {
+  const itemByLabel = new Map(items.map((item) => [item.label, item]));
+
+  return items.map((item) => {
+    if (item.label !== "争议") return item;
+
+    const movedPositiveIds: string[] = [];
+    const keptIds = item.sourceCommentIds.filter((commentId) => {
+      const comment = commentsById.get(commentId);
+      if (!comment) return true;
+
+      const inferredLabel = inferCommentStanceLabel(comment);
+      if (inferredLabel === "好评" && itemByLabel.has("好评")) {
+        movedPositiveIds.push(commentId);
+        return false;
+      }
+
+      return true;
+    });
+
+    if (movedPositiveIds.length === 0) return item;
+
+    const positiveItem = itemByLabel.get("好评");
+    if (positiveItem) {
+      positiveItem.sourceCommentIds = [...new Set([...positiveItem.sourceCommentIds, ...movedPositiveIds])];
+    }
+
+    return {
+      ...item,
+      sourceCommentIds: keptIds,
+      summary: keptIds.length === 0 ? `${item.summary}（已移除不支持争议判断的正向评论依据。）` : item.summary
+    };
+  });
 }
 
 function requireReportInputs(comments: WeightedComment[]) {

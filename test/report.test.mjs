@@ -173,6 +173,77 @@ test("parseReportOutput validates stance distribution and enriches evidence", ()
   ]);
 });
 
+test("parseReportOutput removes clearly positive comments from controversy evidence", () => {
+  const { parseReportOutput } = requireTypeScriptModule(join(process.cwd(), "lib", "report.ts"));
+  const report = parseReportOutput(
+    JSON.stringify({
+      episodeSummary: "summary",
+      opinionSummary: "opinion",
+      discussionHotspots: [],
+      resonancePoints: [],
+      stanceDistribution: [
+        {
+          label: "争议",
+          percentage: 10,
+          summary: "对笑点质量看法两极分化，部分观众认为一般般或中等。",
+          sourceCommentIds: ["post-positive", "post-controversy"]
+        },
+        {
+          label: "好评",
+          percentage: 40,
+          summary: "不少观众认可本集。",
+          sourceCommentIds: []
+        }
+      ]
+    }),
+    {
+      url: "https://bgm.tv/ep/4",
+      episodeId: "4",
+      title: "Episode 4"
+    },
+    [
+      {
+        id: "post-positive",
+        floor: "15",
+        author: "SomeBottle",
+        text: "梦回齐木 笑死，吐槽味太正了，几个魔法还真都有些用，可惜都有副作用，OP 真不错，第一集看下来感觉会是非常有趣的作品，期待后续！",
+        replyCount: 0,
+        reactionCount: 0,
+        likeCount: 0,
+        reactions: [],
+        replies: [],
+        weight: 1,
+        signals: { discussion: 0, resonance: 1, information: 0 }
+      },
+      {
+        id: "post-controversy",
+        floor: "16",
+        author: "critic",
+        text: "这集笑点争议很大，有人觉得好笑，有人觉得无聊。",
+        replyCount: 0,
+        reactionCount: 0,
+        likeCount: 0,
+        reactions: [],
+        replies: [],
+        weight: 1,
+        signals: { discussion: 1, resonance: 0, information: 0 }
+      }
+    ]
+  );
+
+  const controversy = report.stanceDistribution?.find((item) => item.label === "争议");
+  const positive = report.stanceDistribution?.find((item) => item.label === "好评");
+
+  assert.deepEqual(
+    controversy?.sourceEvidence?.map((item) => item.id),
+    ["post-controversy"]
+  );
+  assert.deepEqual(
+    positive?.sourceEvidence?.map((item) => item.id),
+    ["post-positive"]
+  );
+});
+
 test("report prompt presets inject style instructions and fall back to default", () => {
   const { loadReportPrompt, resolveReportPromptPreset } = requireTypeScriptModule(
     join(process.cwd(), "lib", "report-prompt.ts")
