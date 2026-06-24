@@ -112,6 +112,30 @@
     link.style.boxSizing = "border-box";
   }
 
+  function addPrimaryHover(link) {
+    link.addEventListener("mouseenter", function () {
+      link.style.background = "#ffe9df";
+      link.style.borderColor = "#c94b3f";
+    });
+    link.addEventListener("mouseleave", function () {
+      link.style.background = "#fff7ef";
+      link.style.borderColor = "#d9c6bb";
+    });
+  }
+
+  function addSecondaryHover(link) {
+    link.addEventListener("mouseenter", function () {
+      link.style.background = "#eaf3ff";
+      link.style.borderColor = "#315f9f";
+      link.style.color = "#244d84";
+    });
+    link.addEventListener("mouseleave", function () {
+      link.style.background = "#f7fbff";
+      link.style.borderColor = "rgba(73,105,143,0.34)";
+      link.style.color = "#315f9f";
+    });
+  }
+
   function styleBadge(badge, background, border, color) {
     badge.style.display = "inline-flex";
     badge.style.alignItems = "center";
@@ -136,15 +160,7 @@
     button.rel = "noopener noreferrer";
     button.textContent = "Bangumi Lens \u5206\u6790";
     styleButton(button);
-
-    button.addEventListener("mouseenter", function () {
-      button.style.background = "#ffe9df";
-      button.style.borderColor = "#c94b3f";
-    });
-    button.addEventListener("mouseleave", function () {
-      button.style.background = "#fff7ef";
-      button.style.borderColor = "#d9c6bb";
-    });
+    addPrimaryHover(button);
 
     return button;
   }
@@ -187,8 +203,10 @@
       link.style.minHeight = "24px";
       link.style.padding = "0 8px";
       link.style.fontSize = "11px";
+      addPrimaryHover(link);
     } else {
       styleSecondaryLink(link);
+      addSecondaryHover(link);
     }
     return link;
   }
@@ -266,8 +284,8 @@
 
     reportUrl = resolveReportUrl(status);
     savedAtLabel = formatSavedAt(status.savedAt);
-    button.textContent = "\u91cd\u65b0\u751f\u6210";
-    button.href = buildAnalyzeUrl(getEpisodeUrl());
+    button.style.display = "none";
+    button.setAttribute("aria-hidden", "true");
 
     container = document.getElementById(STATUS_ID);
     if (!container) {
