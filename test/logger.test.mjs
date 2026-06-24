@@ -8,10 +8,15 @@ import test from "node:test";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
+const moduleCache = new Map();
+const repoRoot = process.cwd();
 
 function requireTypeScriptModule(path) {
-  assert.equal(existsSync(path), true, `${path} should exist`);
-  const source = readFileSync(path, "utf8");
+  const resolvedPath = path.endsWith(".ts") ? path : `${path}.ts`;
+  assert.equal(existsSync(resolvedPath), true, `${resolvedPath} should exist`);
+  if (moduleCache.has(resolvedPath)) return moduleCache.get(resolvedPath).exports;
+
+  const source = readFileSync(resolvedPath, "utf8");
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: {
       esModuleInterop: true,
@@ -20,7 +25,15 @@ function requireTypeScriptModule(path) {
     }
   });
   const module = { exports: {} };
-  Function("require", "module", "exports", outputText)(require, module, module.exports);
+  moduleCache.set(resolvedPath, module);
+  const localRequire = (specifier) => {
+    if (specifier.startsWith("@/")) {
+      return requireTypeScriptModule(join(repoRoot, specifier.slice(2)));
+    }
+    return require(specifier);
+  };
+
+  Function("require", "module", "exports", outputText)(localRequire, module, module.exports);
   return module.exports;
 }
 

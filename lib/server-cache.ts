@@ -1,5 +1,6 @@
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
+import { isMissingFileError, readJsonFile, writeJsonFile } from "@/lib/fs-json";
 
 type ServerCacheEntry<T> = {
   cachedAt: number;
@@ -14,24 +15,20 @@ function getCacheFilePath(namespace: string, key: string) {
 
 export async function readServerCache<T>(namespace: string, key: string, maxAgeMs: number): Promise<T | undefined> {
   try {
-    const entry = JSON.parse(await readFile(getCacheFilePath(namespace, key), "utf8")) as ServerCacheEntry<T>;
+    const entry = await readJsonFile<ServerCacheEntry<T>>(getCacheFilePath(namespace, key));
     if (!entry || typeof entry.cachedAt !== "number" || Date.now() - entry.cachedAt > maxAgeMs) return undefined;
     return entry.value;
-  } catch (error) {
-    const code = typeof error === "object" && error && "code" in error ? error.code : undefined;
-    if (code === "ENOENT") return undefined;
+  } catch {
     return undefined;
   }
 }
 
 export async function writeServerCache<T>(namespace: string, key: string, value: T) {
-  const filePath = getCacheFilePath(namespace, key);
-  await mkdir(path.dirname(filePath), { recursive: true });
   const entry: ServerCacheEntry<T> = {
     cachedAt: Date.now(),
     value
   };
-  await writeFile(filePath, `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+  await writeJsonFile(getCacheFilePath(namespace, key), entry);
 }
 
 export async function deleteServerCache(namespace: string, key: string) {
@@ -45,17 +42,25 @@ export async function deleteServerCacheByKeyPrefix(namespace: string, keyPrefix:
   try {
     entries = await readdir(namespaceDir);
   } catch (error) {
-    const code = typeof error === "object" && error && "code" in error ? error.code : undefined;
-    if (code === "ENOENT") return;
+    if (isMissingFileError(error)) return;
     throw error;
   }
 
-  await Promise.all(
-    entries
-      .filter((entry) => entry.endsWith(".json"))
-      .filter((entry) => decodeURIComponent(entry.slice(0, -".json".length)).startsWith(keyPrefix))
-      .map((entry) => rm(path.join(namespaceDir, entry), { force: true }))
-  );
+  const deletions: Promise<void>[] = [];
+
+  for (const entry of entries) {
+    if (!entry.endsWith(".json")) continue;
+
+    try {
+      if (decodeURIComponent(entry.slice(0, -".json".length)).startsWith(keyPrefix)) {
+        deletions.push(rm(path.join(namespaceDir, entry), { force: true }));
+      }
+    } catch {
+      // Ignore malformed encoded filenames; cache cleanup should be best-effort.
+    }
+  }
+
+  await Promise.all(deletions);
 }
 
 export async function clearServerCache() {

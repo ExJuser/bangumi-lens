@@ -1,5 +1,6 @@
 import { appendFile, mkdir, open, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { isMissingFileError } from "@/lib/fs-json";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -49,8 +50,7 @@ async function trimLogIfNeeded(filePath: string, maxBytes: number, retainBytes: 
   try {
     size = (await stat(filePath)).size;
   } catch (error) {
-    const code = typeof error === "object" && error && "code" in error ? error.code : undefined;
-    if (code === "ENOENT") return;
+    if (isMissingFileError(error)) return;
     throw error;
   }
 
@@ -86,5 +86,13 @@ function trimPartialFirstLine(value: string) {
 }
 
 function sanitizeFields(fields: LogFields): LogFields {
-  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+  const sanitizedFields: LogFields = {};
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) {
+      sanitizedFields[key] = value;
+    }
+  }
+
+  return sanitizedFields;
 }

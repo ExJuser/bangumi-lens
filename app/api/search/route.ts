@@ -152,8 +152,15 @@ async function searchSubjects(query: string, offset: number) {
     }
   );
 
+  const subjects: BangumiSubject[] = [];
+  for (const subject of payload?.data || []) {
+    if (subject.id) {
+      subjects.push(subject);
+    }
+  }
+
   return {
-    subjects: (payload?.data || []).filter((subject) => subject.id),
+    subjects,
     total: typeof payload?.total === "number" && payload.total >= 0 ? payload.total : 0
   };
 }
@@ -162,14 +169,23 @@ async function fetchFirstEpisode(subjectId: number) {
   const payload = await fetchJson<{ data?: BangumiEpisode[] }>(
     `https://api.bgm.tv/v0/episodes?subject_id=${subjectId}&type=0&limit=100&offset=0`
   );
-  const episodes = (payload?.data || []).filter((episode) => episode.id);
-  if (episodes.length === 0) return undefined;
+  let firstEpisode: BangumiEpisode | undefined;
 
-  return [...episodes].sort((a, b) => {
-    const aSort = typeof a.sort === "number" ? a.sort : Number.MAX_SAFE_INTEGER;
-    const bSort = typeof b.sort === "number" ? b.sort : Number.MAX_SAFE_INTEGER;
-    return aSort - bSort;
-  })[0];
+  for (const episode of payload?.data || []) {
+    if (!episode.id) continue;
+    if (!firstEpisode) {
+      firstEpisode = episode;
+      continue;
+    }
+
+    const episodeSort = typeof episode.sort === "number" ? episode.sort : Number.MAX_SAFE_INTEGER;
+    const firstEpisodeSort = typeof firstEpisode.sort === "number" ? firstEpisode.sort : Number.MAX_SAFE_INTEGER;
+    if (episodeSort < firstEpisodeSort) {
+      firstEpisode = episode;
+    }
+  }
+
+  return firstEpisode;
 }
 
 function buildSearchSubjectEntity(subject: BangumiSubject, episode: BangumiEpisode): SearchSubjectEntity | undefined {
@@ -191,7 +207,8 @@ function buildSearchSubjectEntity(subject: BangumiSubject, episode: BangumiEpiso
 
 async function readSearchSubjectEntity(subjectId: string) {
   const cached = subjectCache.get(subjectId);
-  if (cached && cached.expiresAt > Date.now()) return cached.payload;
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) return cached.payload;
 
   const diskCached = await readServerCache<SearchSubjectEntity>(
     SEARCH_SUBJECT_CACHE_NAMESPACE,
@@ -200,7 +217,7 @@ async function readSearchSubjectEntity(subjectId: string) {
   );
   if (!diskCached?.firstEpisodeId) return undefined;
 
-  subjectCache.set(subjectId, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload: diskCached });
+  subjectCache.set(subjectId, { expiresAt: now + SEARCH_CACHE_TTL_MS, payload: diskCached });
   return diskCached;
 }
 
@@ -210,7 +227,7 @@ async function writeSearchSubjectEntity(entity: SearchSubjectEntity) {
 }
 
 async function buildSearchResults(subjects: BangumiSubject[], options: { refreshEntities?: boolean } = {}) {
-  const results = await Promise.all(
+  const resultReads = await Promise.all(
     subjects.map(async (subject) => {
       if (!subject.id) return undefined;
       const subjectId = String(subject.id);
@@ -229,7 +246,14 @@ async function buildSearchResults(subjects: BangumiSubject[], options: { refresh
     })
   );
 
-  return results.filter((result): result is SearchSubjectEntity => Boolean(result));
+  const results: SearchSubjectEntity[] = [];
+  for (const result of resultReads) {
+    if (result) {
+      results.push(result);
+    }
+  }
+
+  return results;
 }
 
 async function buildSearchPayload(
@@ -268,18 +292,28 @@ async function buildSearchPayload(
 
 function toSearchIndexPayload(payload: SearchPayload): SearchIndexPayload {
   const { results, ...indexPayload } = payload;
+  const subjectIds: string[] = [];
+  for (const result of results) {
+    subjectIds.push(result.subjectId);
+  }
+
   return {
     ...indexPayload,
-    subjectIds: results.map((result) => result.subjectId)
+    subjectIds
   };
 }
 
 async function hydrateSearchPayload(indexPayload: SearchIndexPayload): Promise<SearchPayload | undefined> {
-  const results = await Promise.all(indexPayload.subjectIds.map((subjectId) => readSearchSubjectEntity(subjectId)));
-  if (results.some((result) => !result)) return undefined;
+  const cachedResults = await Promise.all(indexPayload.subjectIds.map((subjectId) => readSearchSubjectEntity(subjectId)));
+  const results: SearchSubjectEntity[] = [];
+
+  for (const result of cachedResults) {
+    if (!result) return undefined;
+    results.push(result);
+  }
 
   return {
-    results: results.filter((result): result is SearchSubjectEntity => Boolean(result)),
+    results,
     total: indexPayload.total,
     page: indexPayload.page,
     pageSize: indexPayload.pageSize,
@@ -297,8 +331,10 @@ function isReusableSubjectInfoCache(cached: CachedSubjectInfoPayload | undefined
 }
 
 async function attachCachedSubjectInfo(results: SearchResult[]) {
-  const enrichedResults = await Promise.all(
-    results.map(async (result) => {
+  const enrichmentReads: Promise<SearchResult>[] = [];
+  for (const result of results) {
+    enrichmentReads.push(
+      (async () => {
       const cached = await readServerCache<CachedSubjectInfoPayload>(
         SUBJECT_INFO_CACHE_NAMESPACE,
         result.subjectId,
@@ -310,10 +346,11 @@ async function attachCachedSubjectInfo(results: SearchResult[]) {
         ...result,
         subjectInfo: cached
       };
-    })
-  );
+      })()
+    );
+  }
 
-  return enrichedResults;
+  return Promise.all(enrichmentReads);
 }
 
 async function attachCachedSubjectInfoToPayload(payload: SearchPayload) {

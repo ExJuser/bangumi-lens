@@ -12,47 +12,97 @@ function informationScore(text: string) {
 }
 
 export function weightComments(comments: BangumiComment[]): WeightedComment[] {
-  return comments
-    .map((comment) => {
-      const discussion = Math.log1p(comment.replyCount) * 2.2;
-      const resonance = Math.log1p(comment.reactionCount) * 1.8;
-      const information = informationScore(comment.text) * 1.6;
-      const weight = discussion + resonance + information;
+  const weightedComments: WeightedComment[] = [];
 
-      return {
-        ...comment,
-        weight,
-        signals: {
-          discussion,
-          resonance,
-          information
-        }
-      };
-    })
-    .sort((a, b) => b.weight - a.weight);
+  for (const comment of comments) {
+    const discussion = Math.log1p(comment.replyCount) * 2.2;
+    const resonance = Math.log1p(comment.reactionCount) * 1.8;
+    const information = informationScore(comment.text) * 1.6;
+    const weight = discussion + resonance + information;
+
+    weightedComments.push({
+      ...comment,
+      weight,
+      signals: {
+        discussion,
+        resonance,
+        information
+      }
+    });
+  }
+
+  return weightedComments.sort((a, b) => b.weight - a.weight);
 }
 
 export function buildCommentDigest(comments: WeightedComment[]) {
   const topOverall = comments.slice(0, 40);
-  const discussionHeavy = [...comments]
-    .filter((comment) => comment.replyCount > 0)
-    .sort((a, b) => b.signals.discussion - a.signals.discussion)
-    .slice(0, 18);
-  const resonanceHeavy = [...comments]
-    .filter((comment) => comment.reactionCount > 0)
-    .sort((a, b) => b.signals.resonance - a.signals.resonance)
-    .slice(0, 18);
+  const discussionHeavy = selectTopBySignal(
+    comments,
+    (comment) => comment.replyCount > 0,
+    (comment) => comment.signals.discussion,
+    18
+  );
+  const resonanceHeavy = selectTopBySignal(
+    comments,
+    (comment) => comment.reactionCount > 0,
+    (comment) => comment.signals.resonance,
+    18
+  );
 
   const byId = new Map<string, WeightedComment>();
-  [...topOverall, ...discussionHeavy, ...resonanceHeavy].forEach((comment) => byId.set(comment.id, comment));
+  addCommentsById(byId, topOverall);
+  addCommentsById(byId, discussionHeavy);
+  addCommentsById(byId, resonanceHeavy);
 
-  return [...byId.values()].map((comment) => ({
-    id: comment.id,
-    floor: comment.floor,
-    author: comment.author,
-    text: comment.text.slice(0, 420),
-    sampleReplies: comment.replies.slice(0, 6).map((reply) => reply.text.slice(0, 180)),
-    signals: comment.signals,
-    weight: Number(comment.weight.toFixed(2))
-  }));
+  const digest = [];
+  for (const comment of byId.values()) {
+    const sampleReplies: string[] = [];
+    for (const reply of comment.replies) {
+      sampleReplies.push(reply.text.slice(0, 180));
+      if (sampleReplies.length >= 6) break;
+    }
+
+    digest.push({
+      id: comment.id,
+      floor: comment.floor,
+      author: comment.author,
+      text: comment.text.slice(0, 420),
+      sampleReplies,
+      signals: comment.signals,
+      weight: Number(comment.weight.toFixed(2))
+    });
+  }
+
+  return digest;
+}
+
+function addCommentsById(byId: Map<string, WeightedComment>, comments: WeightedComment[]) {
+  for (const comment of comments) {
+    byId.set(comment.id, comment);
+  }
+}
+
+function selectTopBySignal(
+  comments: WeightedComment[],
+  include: (comment: WeightedComment) => boolean,
+  readScore: (comment: WeightedComment) => number,
+  limit: number
+) {
+  const selected: WeightedComment[] = [];
+
+  for (const comment of comments) {
+    if (!include(comment)) continue;
+
+    const score = readScore(comment);
+    let insertAt = selected.length;
+    while (insertAt > 0 && readScore(selected[insertAt - 1]) < score) {
+      insertAt -= 1;
+    }
+
+    if (insertAt >= limit) continue;
+    selected.splice(insertAt, 0, comment);
+    if (selected.length > limit) selected.pop();
+  }
+
+  return selected;
 }

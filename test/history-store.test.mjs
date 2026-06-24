@@ -3,14 +3,18 @@ import { mkdtemp, readFile, readdir, rm, mkdir, writeFile } from "node:fs/promis
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import Module from "node:module";
+import { createRequire } from "node:module";
 import test from "node:test";
 import ts from "typescript";
 
+const require = createRequire(import.meta.url);
 const repoRoot = process.cwd();
 
-function loadHistoryStore() {
-  const filename = join(repoRoot, "lib", "history-store.ts");
+function requireTypeScriptModule(path, moduleCache = new Map()) {
+  const filename = path.endsWith(".ts") ? path : `${path}.ts`;
+  assert.equal(existsSync(filename), true, `${filename} should exist`);
+  if (moduleCache.has(filename)) return moduleCache.get(filename).exports;
+
   const source = readFileSync(filename, "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
@@ -20,11 +24,22 @@ function loadHistoryStore() {
     },
     fileName: filename
   }).outputText;
-  const module = new Module(filename);
-  module.filename = filename;
-  module.paths = Module._nodeModulePaths(repoRoot);
-  module._compile(compiled, filename);
+
+  const module = { exports: {} };
+  moduleCache.set(filename, module);
+  const localRequire = (specifier) => {
+    if (specifier.startsWith("@/")) {
+      return requireTypeScriptModule(join(repoRoot, specifier.slice(2)), moduleCache);
+    }
+    return require(specifier);
+  };
+
+  Function("require", "module", "exports", compiled)(localRequire, module, module.exports);
   return module.exports;
+}
+
+function loadHistoryStore() {
+  return requireTypeScriptModule(join(repoRoot, "lib", "history-store.ts"));
 }
 
 function makeReport(index) {
@@ -211,6 +226,41 @@ test("history status marks reports older than fifteen days as stale", async () =
     const status = await readHistoryReportStatus("https://bangumi.tv/ep/12");
     assert.equal(status.exists, true);
     assert.equal(status.stale, true);
+  });
+});
+
+test("history status skips invalid stored urls while finding normalized matches", async () => {
+  await withTempCwd(async (dir) => {
+    const reportsDir = join(dir, "data", "reports");
+    await mkdir(reportsDir, { recursive: true });
+    await writeFile(
+      join(reportsDir, "index.json"),
+      JSON.stringify([
+        {
+          id: "bad-url",
+          url: "not-a-url",
+          savedAt: "2026-06-20T00:00:00.000Z",
+          reportPath: "items/bad-url.json",
+          meta: { ...makeReport(99).meta, url: "https://example.test/ep/99" },
+          stats: makeReport(99).stats
+        },
+        {
+          id: "good-url",
+          url: "https://bangumi.tv/ep/13?from=history",
+          savedAt: "2026-06-20T00:00:00.000Z",
+          reportPath: "items/good-url.json",
+          meta: makeReport(13).meta,
+          stats: makeReport(13).stats
+        }
+      ]),
+      "utf8"
+    );
+
+    const { readHistoryReportStatus } = loadHistoryStore();
+    const status = await readHistoryReportStatus("https://chii.in/ep/13");
+
+    assert.equal(status.exists, true);
+    assert.equal(status.id, "good-url");
   });
 });
 

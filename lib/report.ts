@@ -120,9 +120,34 @@ function createSourceEvidence(comment: WeightedComment, episodeUrl: string): Rep
   };
 }
 
-function enrichReportItemsWithEvidence(items: ReportItem[], comments: WeightedComment[], meta: EpisodeMeta) {
-  const commentsById = new Map(comments.map((comment) => [comment.id, comment]));
+function collectSourceEvidence(
+  commentIds: Iterable<string | undefined>,
+  commentsById: Map<string, WeightedComment>,
+  episodeUrl: string,
+  limit: number
+) {
+  const seen = new Set<string>();
+  const evidence: ReportSourceEvidence[] = [];
 
+  for (const commentId of commentIds) {
+    if (!commentId || seen.has(commentId)) continue;
+    seen.add(commentId);
+
+    const comment = commentsById.get(commentId);
+    if (!comment) continue;
+
+    evidence.push(createSourceEvidence(comment, episodeUrl));
+    if (evidence.length >= limit) break;
+  }
+
+  return evidence;
+}
+
+function enrichReportItemsWithEvidence(
+  items: ReportItem[],
+  commentsById: Map<string, WeightedComment>,
+  meta: EpisodeMeta
+) {
   return items.map((item) => ({
     ...item,
     quotes: item.quotes?.map((quote) => {
@@ -135,33 +160,36 @@ function enrichReportItemsWithEvidence(items: ReportItem[], comments: WeightedCo
         source: createSourceEvidence(sourceComment, meta.url)
       };
     }),
-    sourceEvidence: [...new Set([...(item.sourceCommentIds || []), ...(item.quotes || []).map((quote) => quote.sourceCommentId)])]
-      .map((commentId) => (commentId ? commentsById.get(commentId) : undefined))
-      .filter((comment): comment is WeightedComment => Boolean(comment))
-      .slice(0, 6)
-      .map((comment) => createSourceEvidence(comment, meta.url))
+    sourceEvidence: collectSourceEvidence(
+      function* () {
+        yield* item.sourceCommentIds || [];
+        for (const quote of item.quotes || []) {
+          yield quote.sourceCommentId;
+        }
+      }(),
+      commentsById,
+      meta.url,
+      6
+    )
   }));
 }
 
 function enrichStanceDistributionWithEvidence(
   items: StanceDistributionItem[],
-  comments: WeightedComment[],
+  commentsById: Map<string, WeightedComment>,
   meta: EpisodeMeta
 ) {
-  const commentsById = new Map(comments.map((comment) => [comment.id, comment]));
-
   return rebalanceStanceDistributionEvidence(items, commentsById).map((item) => ({
     ...item,
-    sourceEvidence: [...new Set(item.sourceCommentIds || [])]
-      .map((commentId) => commentsById.get(commentId))
-      .filter((comment): comment is WeightedComment => Boolean(comment))
-      .slice(0, 4)
-      .map((comment) => createSourceEvidence(comment, meta.url))
+    sourceEvidence: collectSourceEvidence(item.sourceCommentIds || [], commentsById, meta.url, 4)
   }));
 }
 
 function inferCommentStanceLabel(comment: WeightedComment): StanceDistributionItem["label"] | undefined {
-  const text = [comment.text, ...comment.replies.map((reply) => reply.text)].join(" ");
+  let text = comment.text;
+  for (const reply of comment.replies) {
+    text += ` ${reply.text}`;
+  }
   const hasPositive = POSITIVE_STANCE_PATTERN.test(text);
   const hasNegative = NEGATIVE_STANCE_PATTERN.test(text);
   const hasControversy = CONTROVERSY_STANCE_PATTERN.test(text);
@@ -401,14 +429,15 @@ export async function refineSeasonTrendSummary(trends: SeasonTrendPayload) {
 export function parseReportOutput(outputText: string, meta: EpisodeMeta, comments: WeightedComment[], presetId?: string): AnalyzeReport {
   const parsed = reportSchema.parse(JSON.parse(outputText));
   const preset = resolveReportPromptPreset(presetId);
+  const commentsById = new Map(comments.map((comment) => [comment.id, comment]));
 
   return {
     ...parsed,
-    episodeDetails: enrichReportItemsWithEvidence(parsed.episodeDetails, comments, meta),
-    productionNotes: enrichReportItemsWithEvidence(parsed.productionNotes, comments, meta),
-    discussionHotspots: enrichReportItemsWithEvidence(parsed.discussionHotspots, comments, meta),
-    resonancePoints: enrichReportItemsWithEvidence(parsed.resonancePoints, comments, meta),
-    stanceDistribution: enrichStanceDistributionWithEvidence(parsed.stanceDistribution, comments, meta),
+    episodeDetails: enrichReportItemsWithEvidence(parsed.episodeDetails, commentsById, meta),
+    productionNotes: enrichReportItemsWithEvidence(parsed.productionNotes, commentsById, meta),
+    discussionHotspots: enrichReportItemsWithEvidence(parsed.discussionHotspots, commentsById, meta),
+    resonancePoints: enrichReportItemsWithEvidence(parsed.resonancePoints, commentsById, meta),
+    stanceDistribution: enrichStanceDistributionWithEvidence(parsed.stanceDistribution, commentsById, meta),
     generatedAt: new Date().toISOString(),
     promptPreset: {
       id: preset.id,

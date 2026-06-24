@@ -146,25 +146,37 @@ function summarizeSubjectRating(rating: unknown): EpisodeRating | undefined {
   };
   if (!payload.count || typeof payload.count !== "object") return undefined;
 
-  const votes = Object.fromEntries(
-    Object.entries(payload.count as Record<string, unknown>)
-      .map(([score, count]) => [score, Number(count)] as const)
-      .filter(([score, count]) => /^\d+$/.test(score) && Number.isFinite(count) && count > 0)
-  );
-  const voteCountFromDistribution = Object.values(votes).reduce((sum, count) => sum + count, 0);
+  const votes: Record<string, number> = {};
+  let voteCountFromDistribution = 0;
+  let weightedScoreSum = 0;
+  let modeScore: number | undefined;
+  let modeCount = 0;
+
+  for (const [score, rawCount] of Object.entries(payload.count as Record<string, unknown>)) {
+    const count = Number(rawCount);
+    if (!/^\d+$/.test(score) || !Number.isFinite(count) || count <= 0) continue;
+
+    const numericScore = Number(score);
+    votes[score] = count;
+    voteCountFromDistribution += count;
+    weightedScoreSum += numericScore * count;
+
+    if (count > modeCount) {
+      modeCount = count;
+      modeScore = numericScore;
+    }
+  }
+
   const voteCount = Number(payload.total) || voteCountFromDistribution;
   if (!Number.isFinite(voteCount) || voteCount <= 0 || voteCountFromDistribution === 0) return undefined;
 
-  const modeEntry = Object.entries(votes).reduce((best, current) => (current[1] > best[1] ? current : best));
   const score = Number(payload.score);
-  const fallbackAverage =
-    Object.entries(votes).reduce((sum, [ratingScore, count]) => sum + Number(ratingScore) * count, 0) /
-    voteCountFromDistribution;
+  const fallbackAverage = weightedScoreSum / voteCountFromDistribution;
 
   return {
     average: Number((Number.isFinite(score) && score > 0 ? score : fallbackAverage).toFixed(2)),
     voteCount,
-    modeScore: Number(modeEntry[0]),
+    modeScore: modeScore!,
     votes
   };
 }
@@ -199,11 +211,17 @@ async function fetchSubjectMainEpisodes(subjectId: string, episodeTotal?: number
     offset += limit;
   }
 
-  return episodes
-    .map(normalizeEpisodeApiItem)
-    .filter((episode): episode is EpisodeAvailabilitySignals => Boolean(episode))
-    .filter((episode) => isWithinMainEpisodeTotal(episode, episodeTotal))
-    .sort((a, b) => (a.sort ?? Number.MAX_SAFE_INTEGER) - (b.sort ?? Number.MAX_SAFE_INTEGER) || Number(a.id) - Number(b.id));
+  const normalizedEpisodes: EpisodeAvailabilitySignals[] = [];
+  for (const episode of episodes) {
+    const normalizedEpisode = normalizeEpisodeApiItem(episode);
+    if (normalizedEpisode && isWithinMainEpisodeTotal(normalizedEpisode, episodeTotal)) {
+      normalizedEpisodes.push(normalizedEpisode);
+    }
+  }
+
+  return normalizedEpisodes.sort(
+    (a, b) => (a.sort ?? Number.MAX_SAFE_INTEGER) - (b.sort ?? Number.MAX_SAFE_INTEGER) || Number(a.id) - Number(b.id)
+  );
 }
 
 function normalizeOptionalString(value: unknown) {
@@ -283,24 +301,34 @@ export async function fetchBangumiEpisodeTitleCn(episodeId: string) {
 }
 
 function summarizeEpisodeRating(votes: Record<string, number>): EpisodeRating | undefined {
-  const entries = Object.entries(votes)
-    .map(([score, count]) => [Number(score), Number(count)] as const)
-    .filter(([score, count]) => Number.isFinite(score) && Number.isFinite(count) && count > 0);
+  const normalizedVotes: Record<string, number> = {};
+  let voteCount = 0;
+  let scoreSum = 0;
+  let modeScore: number | undefined;
+  let modeCount = 0;
 
-  const voteCount = entries.reduce((sum, [, count]) => sum + count, 0);
+  for (const [rawScore, rawCount] of Object.entries(votes)) {
+    const score = Number(rawScore);
+    const count = Number(rawCount);
+    if (!Number.isFinite(score) || !Number.isFinite(count) || count <= 0) continue;
+
+    normalizedVotes[String(score)] = count;
+    voteCount += count;
+    scoreSum += score * count;
+
+    if (count > modeCount) {
+      modeCount = count;
+      modeScore = score;
+    }
+  }
+
   if (voteCount === 0) return undefined;
-
-  const scoreSum = entries.reduce((sum, [score, count]) => sum + score * count, 0);
-  const [modeScore] = entries.reduce(
-    (best, current) => (current[1] > best[1] ? current : best),
-    entries[0]
-  );
 
   return {
     average: Number((scoreSum / voteCount).toFixed(2)),
     voteCount,
-    modeScore,
-    votes: Object.fromEntries(entries.map(([score, count]) => [String(score), count]))
+    modeScore: modeScore!,
+    votes: normalizedVotes
   };
 }
 
@@ -371,29 +399,30 @@ function extractReactions(
   $node: cheerio.Cheerio<Element>
 ): BangumiReaction[] {
   const reactions = new Map<string, number>();
-  const reactionNodes = $node
-    .find(".reactions img, .emoji img, .reactions .item, .emoji .item, .reaction img, .reaction .item")
-    .toArray()
-    .filter(isElement);
-
-  reactionNodes.forEach((node) => {
+  for (const node of $node.find(".reactions img, .emoji img, .reactions .item, .emoji .item, .reaction img, .reaction .item")) {
+    if (!isElement(node)) continue;
     const $reaction = $(node);
     const containerText = normalizeText($reaction.parent().text()) || normalizeText($reaction.text());
     const count = countFromText(containerText, [/(\d+)/]) || 1;
     const label = extractReactionLabel($reaction);
     reactions.set(label, (reactions.get(label) || 0) + count);
-  });
+  }
 
-  const parsedReactions = [...reactions.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .filter((reaction) => reaction.count > 0 && reaction.label !== "表情")
-    .slice(0, 6);
+  const parsedReactions: BangumiReaction[] = [];
+  for (const [label, count] of reactions) {
+    if (count <= 0 || label === "表情") continue;
+    parsedReactions.push({ label, count });
+    if (parsedReactions.length >= 6) break;
+  }
 
   return parsedReactions;
 }
 
 function extractReactionCount($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>, reactions: BangumiReaction[]) {
-  const parsedCount = reactions.reduce((sum, reaction) => sum + reaction.count, 0);
+  let parsedCount = 0;
+  for (const reaction of reactions) {
+    parsedCount += reaction.count;
+  }
   if (parsedCount > 0) return parsedCount;
 
   return extractCount($node, [".reactions", ".emoji", ".reaction"]) || 0;
@@ -406,15 +435,11 @@ function extractId($node: cheerio.Cheerio<Element>, fallback: string) {
 
 function firstTextFrom($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>, selectors: string[]) {
   for (const selector of selectors) {
-    const value = normalizeText(
-      $node
-        .find(selector)
-        .toArray()
-        .map((node) => $(node).text())
-        .find((text) => normalizeText(text))
-        || ""
-    );
-    if (value) return value;
+    const nodes = $node.find(selector);
+    for (const node of nodes) {
+      const value = normalizeText($(node).text());
+      if (value) return value;
+    }
   }
 
   return "";
@@ -435,11 +460,15 @@ function extractAuthor($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>) {
 }
 
 function extractAuthorId($node: cheerio.Cheerio<Element>) {
-  const href = $node
-    .find("a[href^='/user/'], a[href*='bangumi.tv/user/'], a[href*='bgm.tv/user/']")
-    .toArray()
-    .map((node) => node.attribs?.href || "")
-    .find((value) => /(?:^|\/)user\/[^/?#]+/.test(value));
+  let href: string | undefined;
+  for (const node of $node.find("a[href^='/user/'], a[href*='bangumi.tv/user/'], a[href*='bgm.tv/user/']")) {
+    const value = node.attribs?.href || "";
+    if (/(?:^|\/)user\/[^/?#]+/.test(value)) {
+      href = value;
+      break;
+    }
+  }
+
   const userId = href?.match(/(?:^|\/)user\/([^/?#]+)/)?.[1];
   return userId ? decodeURIComponent(userId) : undefined;
 }
@@ -451,23 +480,30 @@ function isElement(node: unknown): node is Element {
 function extractReplyNodes($: cheerio.CheerioAPI, $node: cheerio.Cheerio<Element>) {
   const replyNodes: Element[] = [];
   const seen = new Set<Element>();
-  const replyContainers = $node.find(".topic_sub_reply, .sub_reply, .cmt_sub").toArray().filter(isElement);
+  const replyContainers = $node.find(".topic_sub_reply, .sub_reply, .cmt_sub");
 
-  replyContainers.forEach((container) => {
+  for (const container of replyContainers) {
+    if (!isElement(container)) continue;
     const $container = $(container);
-    const nestedReplies = $container
-      .find("> .row_reply, > li[id^='post_'], > .item, > .reply_item, .sub_reply_bg > .row_reply")
-      .toArray()
-      .filter(isElement);
-    const nodes = nestedReplies.length > 0 ? nestedReplies : [container];
+    const nestedReplies = $container.find(
+      "> .row_reply, > li[id^='post_'], > .item, > .reply_item, .sub_reply_bg > .row_reply"
+    );
+    let nestedReplyCount = 0;
 
-    nodes.forEach((replyNode) => {
+    for (const replyNode of nestedReplies) {
+      if (!isElement(replyNode)) continue;
+      nestedReplyCount += 1;
       if (!seen.has(replyNode)) {
         seen.add(replyNode);
         replyNodes.push(replyNode);
       }
-    });
-  });
+    }
+
+    if (nestedReplyCount === 0 && !seen.has(container)) {
+      seen.add(container);
+      replyNodes.push(container);
+    }
+  }
 
   return replyNodes;
 }
@@ -490,9 +526,13 @@ function extractReply($: cheerio.CheerioAPI, node: Element, parentId: string, in
 function extractComment($: cheerio.CheerioAPI, node: Element, index: number): BangumiComment | null {
   const $node = $(node);
   const id = extractId($node, `comment-${index + 1}`);
-  const replies = extractReplyNodes($, $node)
-    .map((replyNode, replyIndex) => extractReply($, replyNode, id, replyIndex))
-    .filter((reply) => reply.text.length > 0);
+  const replies: BangumiReply[] = [];
+  for (const replyNode of extractReplyNodes($, $node)) {
+    const reply = extractReply($, replyNode, id, replies.length);
+    if (reply.text.length > 0) {
+      replies.push(reply);
+    }
+  }
 
   const cloned = $node.clone();
   cloned.find(".topic_sub_reply, .sub_reply, .cmt_sub, script, style").remove();
@@ -536,16 +576,30 @@ function parseComments($: cheerio.CheerioAPI) {
   ];
 
   for (const selector of selectors) {
-    const comments = $(selector)
-      .toArray()
-      .filter(isElement)
-      .map((node, index) => extractComment($, node, index))
-      .filter((comment): comment is BangumiComment => Boolean(comment));
+    const comments: BangumiComment[] = [];
+    let nodeIndex = 0;
+
+    for (const node of $(selector)) {
+      if (!isElement(node)) continue;
+
+      const comment = extractComment($, node, nodeIndex);
+      nodeIndex += 1;
+      if (comment) {
+        comments.push(comment);
+      }
+    }
 
     if (comments.length > 0) {
       const unique = new Map<string, BangumiComment>();
-      comments.forEach((comment) => unique.set(comment.id, comment));
-      return [...unique.values()];
+      for (const comment of comments) {
+        unique.set(comment.id, comment);
+      }
+
+      const uniqueComments: BangumiComment[] = [];
+      for (const comment of unique.values()) {
+        uniqueComments.push(comment);
+      }
+      return uniqueComments;
     }
   }
 

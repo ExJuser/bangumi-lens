@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import Module from "node:module";
+import { createRequire } from "node:module";
 import test from "node:test";
 import ts from "typescript";
-import { readFileSync } from "node:fs";
 
+const require = createRequire(import.meta.url);
 const repoRoot = process.cwd();
 
-function loadServerCache() {
-  const filename = join(repoRoot, "lib", "server-cache.ts");
+function requireTypeScriptModule(path, moduleCache = new Map()) {
+  const filename = path.endsWith(".ts") ? path : `${path}.ts`;
+  assert.equal(existsSync(filename), true, `${filename} should exist`);
+  if (moduleCache.has(filename)) return moduleCache.get(filename).exports;
+
   const source = readFileSync(filename, "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
@@ -21,11 +25,21 @@ function loadServerCache() {
     fileName: filename
   }).outputText;
 
-  const mod = new Module(filename);
-  mod.filename = filename;
-  mod.paths = Module._nodeModulePaths(repoRoot);
-  mod._compile(compiled, filename);
-  return mod.exports;
+  const module = { exports: {} };
+  moduleCache.set(filename, module);
+  const localRequire = (specifier) => {
+    if (specifier.startsWith("@/")) {
+      return requireTypeScriptModule(join(repoRoot, specifier.slice(2)), moduleCache);
+    }
+    return require(specifier);
+  };
+
+  Function("require", "module", "exports", compiled)(localRequire, module, module.exports);
+  return module.exports;
+}
+
+function loadServerCache() {
+  return requireTypeScriptModule(join(repoRoot, "lib", "server-cache.ts"));
 }
 
 async function withTempCwd(run) {
@@ -34,7 +48,7 @@ async function withTempCwd(run) {
   process.chdir(dir);
 
   try {
-    await run();
+    await run(dir);
   } finally {
     process.chdir(originalCwd);
     await rm(dir, { recursive: true, force: true });
@@ -88,5 +102,21 @@ test("server cache can delete search pages by keyword prefix without touching su
     assert.equal(await readServerCache("bangumi-search-v2", "oni::page=2::size=8", 60_000), undefined);
     assert.deepEqual(await readServerCache("bangumi-search-v2", "onii::page=1::size=8", 60_000), { page: 1 });
     assert.deepEqual(await readServerCache("bangumi-subject-info", "oni", 60_000), { kind: "episode-list" });
+  });
+});
+
+test("server cache prefix deletion skips malformed encoded file names", async () => {
+  await withTempCwd(async (dir) => {
+    const { deleteServerCacheByKeyPrefix, readServerCache, writeServerCache } = loadServerCache();
+    const namespaceDir = join(dir, "data", "cache", "bangumi-search-v2");
+
+    await writeServerCache("bangumi-search-v2", "oni::page=1::size=8", { page: 1 });
+    await mkdir(namespaceDir, { recursive: true });
+    await writeFile(join(namespaceDir, "%E0%A4%A.json"), "not-json", "utf8");
+
+    await deleteServerCacheByKeyPrefix("bangumi-search-v2", "oni::page=");
+
+    assert.equal(await readServerCache("bangumi-search-v2", "oni::page=1::size=8", 60_000), undefined);
+    assert.equal(existsSync(join(namespaceDir, "%E0%A4%A.json")), true);
   });
 });

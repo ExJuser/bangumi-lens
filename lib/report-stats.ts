@@ -14,16 +14,22 @@ export function buildReportStats(
   comments: Pick<WeightedComment, "author" | "authorId" | "replyCount" | "reactionCount" | "replies">[]
 ) {
   const participants = new Set<string>();
+  let replyCount = 0;
+  let reactionCount = 0;
 
-  comments.forEach((comment) => {
+  for (const comment of comments) {
     addParticipant(participants, comment.author, comment.authorId);
-    comment.replies.forEach((reply) => addParticipant(participants, reply.author, reply.authorId));
-  });
+    replyCount += comment.replyCount;
+    reactionCount += comment.reactionCount;
+    for (const reply of comment.replies) {
+      addParticipant(participants, reply.author, reply.authorId);
+    }
+  }
 
   return {
     commentCount: comments.length,
-    replyCount: comments.reduce((sum, comment) => sum + comment.replyCount, 0),
-    reactionCount: comments.reduce((sum, comment) => sum + comment.reactionCount, 0),
+    replyCount,
+    reactionCount,
     participantCount: participants.size
   };
 }

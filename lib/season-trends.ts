@@ -116,21 +116,44 @@ function getTrendDirection(values: number[]): SeasonTrendDirection {
 }
 
 function summarizeMetric(episodes: SeasonTrendEpisode[], readValue: (episode: SeasonTrendEpisode) => number | undefined) {
-  const points = episodes
-    .map((episode) => ({ episode, value: readValue(episode) }))
-    .filter((point): point is { episode: SeasonTrendEpisode; value: number } => typeof point.value === "number");
-  const peak = points.reduce<(typeof points)[number] | undefined>(
-    (currentPeak, point) => (!currentPeak || point.value > currentPeak.value ? point : currentPeak),
-    undefined
-  );
+  let first: number | undefined;
+  let latest: number | undefined;
+  let peak: number | undefined;
+  let peakEpisodeLabel: string | undefined;
+  let valueCount = 0;
+
+  for (const episode of episodes) {
+    const value = readValue(episode);
+    if (typeof value !== "number") continue;
+
+    if (valueCount === 0) first = value;
+    latest = value;
+    valueCount += 1;
+
+    if (typeof peak !== "number" || value > peak) {
+      peak = value;
+      peakEpisodeLabel = episode.label;
+    }
+  }
 
   return {
-    first: points[0]?.value,
-    latest: points[points.length - 1]?.value,
-    peak: peak?.value,
-    peakEpisodeLabel: peak?.episode.label,
-    direction: getTrendDirection(points.map((point) => point.value))
+    first,
+    latest,
+    peak,
+    peakEpisodeLabel,
+    direction: getTrendDirectionFromEndpoints(first, latest, valueCount)
   };
+}
+
+function getTrendDirectionFromEndpoints(first: number | undefined, latest: number | undefined, count: number): SeasonTrendDirection {
+  if (count < 2) return "unknown";
+  if (!Number.isFinite(first) || !Number.isFinite(latest)) return "unknown";
+  const firstValue = first as number;
+  const latestValue = latest as number;
+  const threshold = Math.max(Math.abs(firstValue) * 0.05, 0.5);
+  if (latestValue - firstValue > threshold) return "rising";
+  if (firstValue - latestValue > threshold) return "falling";
+  return "stable";
 }
 
 function itemHeat(item: ReportItem, episode: SeasonTrendEpisode) {
@@ -143,22 +166,34 @@ function collectPoints(
   readItems: (report: AnalyzeReport) => ReportItem[],
   filterItem?: (item: ReportItem) => boolean
 ) {
-  return reports
-    .flatMap((report) => {
-      const episode = episodesById.get(report.meta.episodeId);
-      if (!episode) return [];
-      return readItems(report)
-        .filter((item) => !filterItem || filterItem(item))
-        .map((item) => ({
-          title: item.title,
-          summary: item.summary,
-          episodeId: report.meta.episodeId,
-          episodeLabel: episode.label,
-          heat: itemHeat(item, episode)
-        }));
-    })
-    .sort((a, b) => b.heat - a.heat)
-    .slice(0, 8);
+  const points: SeasonTrendPoint[] = [];
+
+  for (const report of reports) {
+    const episode = episodesById.get(report.meta.episodeId);
+    if (!episode) continue;
+
+    for (const item of readItems(report)) {
+      if (filterItem && !filterItem(item)) continue;
+
+      const point = {
+        title: item.title,
+        summary: item.summary,
+        episodeId: report.meta.episodeId,
+        episodeLabel: episode.label,
+        heat: itemHeat(item, episode)
+      };
+      let insertAt = points.length;
+      while (insertAt > 0 && points[insertAt - 1].heat < point.heat) {
+        insertAt -= 1;
+      }
+
+      if (insertAt >= 8) continue;
+      points.splice(insertAt, 0, point);
+      if (points.length > 8) points.pop();
+    }
+  }
+
+  return points;
 }
 
 function isControversyItem(item: ReportItem) {
@@ -188,23 +223,41 @@ function getLocalSummary(payload: Omit<SeasonTrendPayload, "localSummary">) {
 }
 
 function findSubjectReports(reports: AnalyzeReport[], subjectId?: string, subjectName?: string) {
-  const directMatches = subjectId ? reports.filter((report) => report.meta.subjectId === subjectId) : [];
+  const directMatches: AnalyzeReport[] = [];
+  if (subjectId) {
+    for (const report of reports) {
+      if (report.meta.subjectId === subjectId) {
+        directMatches.push(report);
+      }
+    }
+  }
   if (directMatches.length > 0) return directMatches;
 
   const normalizedSubjectName = subjectName?.trim();
   if (!normalizedSubjectName) return [];
-  return reports.filter((report) => normalizeSubjectName(report) === normalizedSubjectName);
+
+  const nameMatches: AnalyzeReport[] = [];
+  for (const report of reports) {
+    if (normalizeSubjectName(report) === normalizedSubjectName) {
+      nameMatches.push(report);
+    }
+  }
+  return nameMatches;
 }
 
 function getFinalKnownEpisodeSort(reports: AnalyzeReport[]) {
-  const finalSorts = reports
-    .map((report) => {
-      if (report.meta.nextEpisodeId !== null) return undefined;
-      return report.meta.episodeSort ?? report.meta.episodeNumber;
-    })
-    .filter((episodeSort): episodeSort is number => typeof episodeSort === "number" && episodeSort > 0);
-  if (finalSorts.length === 0) return undefined;
-  return Math.max(...finalSorts);
+  let finalKnownEpisodeSort: number | undefined;
+
+  for (const report of reports) {
+    if (report.meta.nextEpisodeId !== null) continue;
+    const episodeSort = report.meta.episodeSort ?? report.meta.episodeNumber;
+    if (typeof episodeSort !== "number" || episodeSort <= 0) continue;
+    if (typeof finalKnownEpisodeSort !== "number" || episodeSort > finalKnownEpisodeSort) {
+      finalKnownEpisodeSort = episodeSort;
+    }
+  }
+
+  return finalKnownEpisodeSort;
 }
 
 function resolveEpisodeTotal(reports: AnalyzeReport[], overrideEpisodeTotal?: number) {
@@ -228,8 +281,15 @@ export function buildSeasonTrendPayload(
   subjectName?: string,
   options: { episodeTotal?: number } = {}
 ): SeasonTrendPayload {
+  const allReports: AnalyzeReport[] = [];
+  for (const item of savedReports) {
+    if (item.report) {
+      allReports.push(item.report);
+    }
+  }
+
   const reports = findSubjectReports(
-    savedReports.map((item) => item.report).filter(Boolean),
+    allReports,
     subjectId,
     subjectName
   ).sort((a, b) => {
@@ -241,11 +301,14 @@ export function buildSeasonTrendPayload(
   const resolvedSubjectName = reports[0] ? normalizeSubjectName(reports[0]) : subjectName?.trim() || "未分类作品";
   const episodeTotal = resolveEpisodeTotal(reports, options.episodeTotal);
   const requiredReportCount = getRequiredReportCount(episodeTotal);
-  const episodes = reports.map((report) => {
+  const episodes: SeasonTrendEpisode[] = [];
+  const episodesById = new Map<string, SeasonTrendEpisode>();
+
+  for (const report of reports) {
     const participantCount = report.stats.participantCount ?? report.stats.commentCount;
     const discussionHeat = report.stats.commentCount + report.stats.replyCount + report.stats.reactionCount;
 
-    return {
+    const episode = {
       id: report.meta.episodeId,
       url: report.meta.url,
       label: getEpisodeLabel(report),
@@ -261,8 +324,10 @@ export function buildSeasonTrendPayload(
       participantCount,
       discussionHeat
     };
-  });
-  const episodesById = new Map(episodes.map((episode) => [episode.id, episode]));
+    episodes.push(episode);
+    episodesById.set(episode.id, episode);
+  }
+
   const available = episodes.length >= requiredReportCount;
   const basePayload = {
     subjectId,

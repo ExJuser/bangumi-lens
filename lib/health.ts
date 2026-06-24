@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { isMissingFileError } from "@/lib/fs-json";
 import { APP_LOG_FILE } from "@/lib/logger";
 import { readHistoryIndex } from "@/lib/history-store";
 
@@ -32,43 +33,49 @@ export type HealthLogEntry = {
 
 const CACHE_DIR = path.join(process.cwd(), "data", "cache");
 
-async function walkFiles(dir: string): Promise<string[]> {
+type CacheStats = {
+  fileCount: number;
+  totalBytes: number;
+};
+
+async function getDirectoryStats(dir: string): Promise<CacheStats> {
   let entries;
 
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch (error) {
-    const code = typeof error === "object" && error && "code" in error ? error.code : undefined;
-    if (code === "ENOENT") return [];
+    if (isMissingFileError(error)) return { fileCount: 0, totalBytes: 0 };
     throw error;
   }
 
-  const files = await Promise.all(
-    entries.map((entry) => {
-      const entryPath = path.join(dir, entry.name);
-      return entry.isDirectory() ? walkFiles(entryPath) : [entryPath];
-    })
-  );
+  const statsReads: Promise<CacheStats>[] = [];
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      statsReads.push(getDirectoryStats(entryPath));
+      continue;
+    }
 
-  return files.flat();
-}
+    statsReads.push(
+      stat(entryPath)
+        .then((fileStats) => ({
+          fileCount: 1,
+          totalBytes: fileStats.size
+        }))
+        .catch(() => ({
+          fileCount: 1,
+          totalBytes: 0
+        }))
+    );
+  }
 
-async function getCacheStats() {
-  const files = await walkFiles(CACHE_DIR);
-  const sizes = await Promise.all(
-    files.map(async (file) => {
-      try {
-        return (await stat(file)).size;
-      } catch {
-        return 0;
-      }
-    })
-  );
+  const total = { fileCount: 0, totalBytes: 0 };
+  for (const current of await Promise.all(statsReads)) {
+    total.fileCount += current.fileCount;
+    total.totalBytes += current.totalBytes;
+  }
 
-  return {
-    fileCount: files.length,
-    totalBytes: sizes.reduce((total, size) => total + size, 0)
-  };
+  return total;
 }
 
 async function readRecentErrorLogs(): Promise<HealthLogEntry[]> {
@@ -77,29 +84,34 @@ async function readRecentErrorLogs(): Promise<HealthLogEntry[]> {
   try {
     content = await readFile(APP_LOG_FILE, "utf8");
   } catch (error) {
-    const code = typeof error === "object" && error && "code" in error ? error.code : undefined;
-    if (code === "ENOENT") return [];
+    if (isMissingFileError(error)) return [];
     throw error;
   }
 
-  return content
-    .trim()
-    .split("\n")
-    .slice(-200)
-    .map((line) => {
-      try {
-        return JSON.parse(line) as HealthLogEntry;
-      } catch {
-        return undefined;
+  const lines = content.trim().split("\n");
+  const recentErrors: HealthLogEntry[] = [];
+  const firstLineIndex = Math.max(0, lines.length - 200);
+
+  for (let index = lines.length - 1; index >= firstLineIndex && recentErrors.length < 5; index -= 1) {
+    try {
+      const entry = JSON.parse(lines[index]) as HealthLogEntry;
+      if (entry?.level === "error") {
+        recentErrors.push(entry);
       }
-    })
-    .filter((entry): entry is HealthLogEntry => Boolean(entry && entry.level === "error"))
-    .slice(-5)
-    .reverse();
+    } catch {
+      // Ignore malformed log lines; health checks should keep reporting the valid recent errors.
+    }
+  }
+
+  return recentErrors;
 }
 
 export async function getHealthStatus(): Promise<HealthStatus> {
-  const [history, cache, recentErrors] = await Promise.all([readHistoryIndex(), getCacheStats(), readRecentErrorLogs()]);
+  const [history, cache, recentErrors] = await Promise.all([
+    readHistoryIndex(),
+    getDirectoryStats(CACHE_DIR),
+    readRecentErrorLogs()
+  ]);
 
   return {
     reports: {

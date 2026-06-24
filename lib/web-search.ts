@@ -18,12 +18,21 @@ function subjectTitle(meta: EpisodeMeta) {
   return meta.subjectTitleCn || meta.subjectTitle || "";
 }
 
+function joinQueryParts(parts: string[]) {
+  let query = "";
+  for (const part of parts) {
+    if (!part) continue;
+    query = query ? `${query} ${part}` : part;
+  }
+  return query;
+}
+
 function buildEpisodeQuery(meta: EpisodeMeta) {
-  return [subjectTitle(meta), meta.title, "episode", "recap", "剧情", "本集"].filter(Boolean).join(" ");
+  return joinQueryParts([subjectTitle(meta), meta.title, "episode", "recap", "剧情", "本集"]);
 }
 
 function buildProductionQuery(meta: EpisodeMeta) {
-  return [
+  return joinQueryParts([
     subjectTitle(meta),
     meta.title,
     "staff",
@@ -35,9 +44,7 @@ function buildProductionQuery(meta: EpisodeMeta) {
     "key animator",
     "cast",
     "CV"
-  ]
-    .filter(Boolean)
-    .join(" ");
+  ]);
 }
 
 function decodeDuckDuckGoUrl(rawUrl?: string) {
@@ -99,9 +106,18 @@ export async function searchEpisodeWebContext(meta: EpisodeMeta): Promise<WebSea
   ]);
 
   const uniqueResults = new Map<string, WebSearchResult>();
-  [...episodeResults, ...productionResults].forEach((result) => {
+  for (const result of episodeResults) {
     uniqueResults.set(result.url || `${result.kind}:${result.title}`, result);
-  });
+  }
+  for (const result of productionResults) {
+    uniqueResults.set(result.url || `${result.kind}:${result.title}`, result);
+  }
 
-  return [...uniqueResults.values()].slice(0, 8);
+  const results: WebSearchResult[] = [];
+  for (const result of uniqueResults.values()) {
+    results.push(result);
+    if (results.length >= 8) break;
+  }
+
+  return results;
 }
